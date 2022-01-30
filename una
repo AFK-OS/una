@@ -10,6 +10,11 @@ fatal() {
     kill $$
 }
 
+info() {
+    echo -e "${bold}info${normal}: $@"
+    kill $$
+}
+
 _help() {
     echo -e "${bold}Una - a simple MPR helper${normal}"
     echo
@@ -26,10 +31,15 @@ _help() {
 _install() {
     pkgname="$1"
 
+    dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
+        fatal "${pkgname} is already installed"
+    ) || true
+
+    info 'creating build directory'
     rm -rf "~/.cache/una/pkgs/${pkgname}"
     mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
 
-    echo "${bold}installing${normal} ${pkgname}"
+    info "cloning ${pkgname}"
     git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
         ( sudo apt-get install -y "${pkgname}" || (fatal "this package doesn't exist") ) || true
 
@@ -37,13 +47,17 @@ _install() {
 
     source "${pkgname}/PKGBUILD"
 
+    info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${optdepends[@]}"; do
         dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || _install "$depend"
+        sudo apt-mark auto "$depend" &>/dev/null
         pkgname="$1"
     done
 
     pkgname="$1"
-    cd "${pkgname}" && makedeb -si
+
+    echo "building ${pkgname}"
+    cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -si
 }
 
 _remove() {
