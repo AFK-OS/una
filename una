@@ -1,0 +1,65 @@
+#!/bin/bash
+
+bold="$(tput bold)"
+normal="$(tput sgr0)"
+
+set -e
+
+fatal() {
+    echo -e "${bold}fatal error${normal}: $@"
+    kill $$
+}
+
+_help() {
+    echo -e "${bold}Una - a simple MPR helper${normal}"
+    echo
+    echo "Syntax: una <COMMAND> [PACKAGE]"
+    echo
+    echo "commands:"
+    echo
+    echo "  install     Install a package."
+    echo "  update      Update the APT cache."
+    echo "  remove      Remove a package."
+    echo
+}
+
+_install() {
+    pkgname="$1"
+
+    rm -rf ~/.cache/una/pkgs
+    mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
+
+    echo "${bold}installing${normal} ${pkgname}"
+    git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
+        ( sudo apt-get install -y "${pkgname}" || (fatal "this package doesn't exist") ) || true
+
+    dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true
+
+    source "${pkgname}/PKGBUILD"
+
+    for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${optdepends[@]}"; do
+        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || _install "$depend"
+        pkgname="$1"
+    done
+
+    pkgname="$1"
+    cd "${pkgname}" && makedeb -si
+}
+
+_remove() {
+    pkgname="$1"
+
+    apt-get purge -y "${pkgname}"
+}
+
+if [ "$1" == "install" ] && [ "$2" != "" ]; then
+	_install "$2";
+elif [ "$1" == "update" ]; then
+	apt-get update;
+elif [ "$1" == "remove" ] && [ "$1" == "purge" ]; then
+    _remove "$2";
+elif [ "$1" == "upgrade" ]; then
+	echo 'Sorry, not implemented yet.';
+elif [ "$1" == "" ]; then
+    _help;
+fi
