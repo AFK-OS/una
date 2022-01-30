@@ -26,7 +26,7 @@ _help() {
 _install() {
     pkgname="$1"
 
-    rm -rf ~/.cache/una/pkgs
+    rm -rf "~/.cache/una/pkgs/${pkgname}"
     mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
 
     echo "${bold}installing${normal} ${pkgname}"
