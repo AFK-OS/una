@@ -131,10 +131,16 @@ _remove() {
 _search() {
     pkgname="$1"
 
+    info 'showing MPR packages'
+
     [ ${#pkgname} -lt 2 ] && fatal 'search string too short (the length should be greater than 1)'
 
     CURL=$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}")
-    paste -d" " <(echo "$CURL" | jq --raw-output '.results[].Name') <(echo "$CURL" | jq --raw-output '.results[].Version')
+    paste <(echo "$(echo "$CURL" | jq --raw-output '.results[].Name'):") <(echo $CURL | jq --raw-output '.results[].Description')
+
+    echo
+    info 'showing APT packages'
+    apt-cache search "${pkgname}" 2>/dev/null
 }
 
 _info() {
