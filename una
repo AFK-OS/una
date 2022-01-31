@@ -83,12 +83,16 @@ _install() {
 
     info "cloning ${pkgname}"
     LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
-        ( sudo apt-get install -y "${pkgname}" && ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null || true ) \
-        || fatal "this package doesn't exist or an error occured" ) || true
+        ( sudo apt-get install -y "${pkgname}" && ( ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; \
+        touch "/tmp/${pkgname}.lock" ) || true ) || fatal "this package doesn't exist or an error occured" ) || true
 
     if [ "$2" != "force" ]; then
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
+    elif [ "$2" == "force" ] && [[ -f "/tmp/${pkgname}.lock" ]]; then
+        rm -f "/tmp/${pkgname}.lock"; return;
     fi
+
+    rm -f "/tmp/${pkgname}.lock"
 
     source "${pkgname}/PKGBUILD"
 
