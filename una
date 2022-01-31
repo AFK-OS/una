@@ -39,8 +39,8 @@ try:
 
     data = sys.argv[1]
 
-    if all_versions[all_packages.index(data.split(':')[0])] != data.split(':')[1]:
-        print(f"_install {data.split(':')[0]} force")
+    if all_versions[all_packages.index(data.split(' ')[0])] != data.split(' ')[1]:
+        print(f"_install {data.split(' ')[0]} force")
 except:
     print('')
 EOF
@@ -83,8 +83,12 @@ _install() {
 
     info "cloning ${pkgname}"
     LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
-        ( sudo apt-get install -y "${pkgname}" && ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null \
-        && sshell_exit || sshell_exit ) || (fatal "this package doesn't exist or an error occured") ) || true
+        ( sudo apt-get install -y "${pkgname}" && ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null || true ) \
+        || fatal "this package doesn't exist or an error occured" ) || true
+
+    if [ "$2" != "force" ]; then
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true
+    fi
 
     source "${pkgname}/PKGBUILD"
 
@@ -112,14 +116,14 @@ _install() {
     cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -i
 
     sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
-    grep -q "^${pkgname}:" /var/lib/una/status && grep -v "^${pkgname}:" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
-    printf "\n${pkgname}:$(dpkg-query --showformat='${Version}' --show ${pkgname})" | sudo tee -a /var/lib/una/status &>/dev/null
+    grep -q "^${pkgname} " /var/lib/una/status && grep -v "^${pkgname} " /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
+    printf "\n${pkgname} $(dpkg-query --showformat='${Version}' --show ${pkgname})" | sudo tee -a /var/lib/una/status &>/dev/null
     grep -v "^$" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
 
 _upgrade() {
     if [ "$1" != "" ]; then
-        _install "$1"; return;
+        _install "$1" force; return;
     fi
 
     info 'upgrading MPR packages'
@@ -137,7 +141,7 @@ _remove() {
     sudo apt-get purge -y "${pkgname}"
 
     sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
-    grep -q "^${pkgname}:" /var/lib/una/status && grep -v "^${pkgname}:" /var/lib/una/status 2>/dev/null | grep -v "^$" 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
+    grep -q "^${pkgname} " /var/lib/una/status && grep -v "^${pkgname} " /var/lib/una/status 2>/dev/null | grep -v "^$" 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
 
 _search() {
