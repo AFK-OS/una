@@ -101,7 +101,7 @@ _install() {
     codename_depends="${VERSION_CODENAME}_depends"
     codename_makedepends="${VERSION_CODENAME}_makedepends"
     [ "${!codename_depends}" != "" ] && eval "depends=(\${$codename_depends[*]})"
-    [ "${!codename_makedepends}" != "" ] && eval "depends=(\${$codename_makedepends[*]})"
+    [ "${!codename_makedepends}" != "" ] && eval "makedepends=(\${$codename_makedepends[*]})"
 
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${new_optdepends[@]}"; do
