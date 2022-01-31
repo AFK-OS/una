@@ -68,7 +68,7 @@ _install() {
     pkgname="$1"
 
     if [ "$2" != "force" ]; then
-        dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
             fatal "${pkgname} is already installed"
         ) || true
     fi
@@ -78,10 +78,11 @@ _install() {
     mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
 
     info "cloning ${pkgname}"
-    git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
+    LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
         ( sudo apt-get install -y "${pkgname}" || (fatal "this package doesn't exist") ) || true
+    rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null || true
 
-    if dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && [ "$2" != "force" ]; then
+    if LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && [ "$2" != "force" ]; then
         return
     fi
 
