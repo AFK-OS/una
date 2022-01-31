@@ -60,7 +60,7 @@ _help() {
 }
 
 _install() {
-    sudo mkdir -p /var/lib/una/lists
+    sudo mkdir -p /var/lib/una
 
     pkgname="$1"
 
@@ -97,6 +97,7 @@ _install() {
     cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -si
 
     sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
+    grep -q "^${pkgname}:" /var/lib/una/status && grep -v "^${pkgname}:" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
     printf "\n${pkgname}:$(dpkg-query --showformat='${Version}' --show ${pkgname})" | sudo tee -a /var/lib/una/status &>/dev/null
     grep -v "^$" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
