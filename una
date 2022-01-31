@@ -74,7 +74,7 @@ _install() {
     fi
 
     info 'creating build directory'
-    rm -rf "~/.cache/una/pkgs/${pkgname}"
+    rm -rf "${HOME}/.cache/una/pkgs/${pkgname}"
     mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
 
     info "cloning ${pkgname}"
@@ -87,8 +87,13 @@ _install() {
 
     source "${pkgname}/PKGBUILD"
 
+    new_optdepends=()
+    for depend in "${optdepends[@]}"; do
+        new_optdepends+=( $(echo "${depend}" | cut -d':' -f1) )
+    done
+
     info "installing dependencies of ${pkgname}"
-    for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${optdepends[@]}"; do
+    for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${new_optdepends[@]}"; do
         dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || _install "$depend"
         sudo apt-mark auto "$depend" &>/dev/null
         pkgname="$1"
