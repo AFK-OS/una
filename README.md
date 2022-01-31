@@ -1,6 +1,7 @@
 <div id="top"></div>
 
-<h1 align="center">Una</h3>
+<h1 align="center">Una</h1>
+<h3 align="center">v0.4.0</h3>
 
 <br>
 
@@ -33,6 +34,7 @@ Una is a really simple MPR helper (written in Bash lol). It was created since th
 
 - [x] Support for installing and removing packages.
 - [x] Support for dependencies from the MPR.
+- [x] Support for updates.
 - [ ] Support for searching for packages.
 - [ ] Support for showing package information.
 

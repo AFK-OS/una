@@ -12,7 +12,34 @@ fatal() {
 
 info() {
     echo -e "${bold}info${normal}: $@"
-    kill $$
+}
+
+trim_string() {
+    local var="$*"
+    var="${var#"${var%%[![:space:]]*}"}"
+    var="${var%"${var##*[![:space:]]}"}"
+    printf '%s' "$var"
+}
+
+update_command() {
+    local pkg="$1"
+
+    python3 - "${pkg}" <<'EOF'
+import requests, sys
+
+try:
+    resp = requests.get('https://mpr.hunterwittenborn.com/packages-meta-ext-v1.json.gz')
+    paklist = resp.json()
+    all_packages = [ x["Name"] for x in paklist ]
+    all_versions = [ x["Version"] for x in paklist ]
+
+    data = sys.argv[1]
+
+    if all_versions[all_packages.index(data.split(':')[0])] != data.split(':')[1]:
+        print(f"_install {data.split(':')[0]} force")
+except:
+    print('')
+EOF
 }
 
 _help() {
@@ -24,16 +51,24 @@ _help() {
     echo
     echo "  install     Install a package."
     echo "  update      Update the APT cache."
+    echo "  upgrade     Upgrade all installed packages."
     echo "  remove      Remove a package."
     echo
+    echo "${bold}Do not use 'apt remove' or 'apt purge' on MPR packages."
+    echo "The package will get reinstalled when updating if an update for it is available."
+    echo "Instead, use 'una remove' (replacement for 'apt purge' for MPR packages)."
 }
 
 _install() {
+    sudo mkdir -p /var/lib/una/lists
+
     pkgname="$1"
 
-    dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
-        fatal "${pkgname} is already installed"
-    ) || true
+    if [ "$2" != "force" ]; then
+        dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
+            fatal "${pkgname} is already installed"
+        ) || true
+    fi
 
     info 'creating build directory'
     rm -rf "~/.cache/una/pkgs/${pkgname}"
@@ -43,7 +78,9 @@ _install() {
     git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
         ( sudo apt-get install -y "${pkgname}" || (fatal "this package doesn't exist") ) || true
 
-    dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true
+    if dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && [ "$2" != "force" ]; then
+        return
+    fi
 
     source "${pkgname}/PKGBUILD"
 
@@ -58,24 +95,59 @@ _install() {
 
     echo "building ${pkgname}"
     cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -si
+
+    sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
+    printf "\n${pkgname}:$(dpkg-query --showformat='${Version}' --show ${pkgname})" | sudo tee -a /var/lib/una/status &>/dev/null
+    grep -v "^$" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
+}
+
+_upgrade() {
+    if [ "$1" != "" ]; then
+        _install "$1"; return;
+    fi
+
+    info 'upgrading MPR packages'
+    grep -v '^$' /var/lib/una/status | while IFS= read -r line; do
+        $(update_command "$line")
+    done
+    echo
+    info 'upgrading APT packages'
+    sudo apt upgrade -y
 }
 
 _remove() {
     pkgname="$1"
 
-    apt-get purge -y "${pkgname}"
+    sudo apt-get purge -y "${pkgname}"
+
+    sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
+    grep -q "^${pkgname}:" /var/lib/una/status && grep -v "^${pkgname}:" /var/lib/una/status 2>/dev/null | grep -v "^$" 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
 
 [ "$EUID" = "0" ] && fatal 'running as root can cause problems'
 
+# check if lockfile exists
+LOCKFILE=/tmp/una.lock
+if [ -e /tmp/una.lock ] && kill -0 $(cat "${LOCKFILE}"); then
+    fatal "already running as PID $(cat "${LOCKFILE}")"
+    exit
+fi
+
+# create lockfile
+trap "rm -f ${LOCKFILE}; exit" INT TERM EXIT
+echo $$ > ${LOCKFILE}
+
 if [ "$1" = "install" ] && [ "$2" != "" ]; then
 	_install "$2";
 elif [ "$1" = "update" ]; then
-	apt-get update;
-elif [ "$1" = "remove" ] && [ "$1" = "purge" ]; then
+	sudo apt-get update;
+elif [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
     _remove "$2";
 elif [ "$1" = "upgrade" ]; then
-	echo 'Sorry, not implemented yet.';
+    _upgrade "$2";
 elif [ "$1" = "" ]; then
     _help;
 fi
+
+# remove lockfile
+rm -f "${LOCKFILE}"
