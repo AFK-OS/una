@@ -28,7 +28,7 @@ update_command() {
 import requests, sys
 
 try:
-    resp = requests.get('https://mpr.hunterwittenborn.com/packages-meta-ext-v1.json.gz')
+    resp = requests.get('https://mpr.makedeb.org/packages-meta-ext-v1.json.gz')
     paklist = resp.json()
     all_packages = [ x["Name"] for x in paklist ]
     all_versions = [ x["Version"] for x in paklist ]
@@ -43,7 +43,7 @@ EOF
 }
 
 _help() {
-    echo -e "${bold}Una - a simple MPR helper${normal}"
+    echo -e "${bold}Una - a complete MPR helper${normal}"
     echo
     echo "Syntax: una <COMMAND> [PACKAGE]"
     echo
@@ -53,6 +53,9 @@ _help() {
     echo "  update      Update the APT cache."
     echo "  upgrade     Upgrade all installed packages."
     echo "  remove      Remove a package."
+    echo "  list        List installed packages."
+    echo "  info        Show package information."
+    echo "  search      Search for packages."
     echo
     echo "${bold}Do not use 'apt remove' or 'apt purge' on MPR packages."
     echo "The package will get reinstalled when updating if an update for it is available."
@@ -94,7 +97,7 @@ _install() {
     pkgname="$1"
 
     echo "building ${pkgname}"
-    cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -si
+    cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -i
 
     sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
     grep -q "^${pkgname}:" /var/lib/una/status && grep -v "^${pkgname}:" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
@@ -125,6 +128,57 @@ _remove() {
     grep -q "^${pkgname}:" /var/lib/una/status && grep -v "^${pkgname}:" /var/lib/una/status 2>/dev/null | grep -v "^$" 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
 
+_search() {
+    pkgname="$1"
+
+    [ ${#pkgname} -lt 2 ] && fatal 'search string too short (the length should be greater than 1)'
+
+    CURL=$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}")
+    paste -d" " <(echo "$CURL" | jq --raw-output '.results[].Name') <(echo "$CURL" | jq --raw-output '.results[].Version')
+}
+
+_info() {
+    pkgname="$1"
+
+    CURL=$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=info&arg=${pkgname}")
+    python3 - "${pkgname}" <<'EOF' || ( apt-cache show "${pkgname}" 2>/dev/null || fatal "this package doesn't exist or you're not connected to a network" )
+import requests, sys, os
+
+from datetime import datetime
+
+class color:
+   PURPLE = '\033[95m'
+   CYAN = '\033[96m'
+   DARKCYAN = '\033[36m'
+   BLUE = '\033[94m'
+   GREEN = '\033[92m'
+   YELLOW = '\033[93m'
+   RED = '\033[91m'
+   BOLD = '\033[1m'
+   UNDERLINE = '\033[4m'
+   END = '\033[0m'
+
+try:
+    resp = requests.get(f"https://mpr.makedeb.org/rpc?v=5&type=info&arg={sys.argv[1]}")
+    pkginfo = resp.json()
+    print(color.BOLD + 'Name:' + color.END, pkginfo['results'][0]['Name'])
+    print(color.BOLD + 'Maintainer:' + color.END, pkginfo['results'][0]['Maintainer'])
+    print(color.BOLD + 'Last modified:' + color.END, datetime.fromtimestamp(pkginfo['results'][0]['LastModified']))
+    print(color.BOLD + 'Description:' + color.END, pkginfo['results'][0]['Description'])
+    print(color.BOLD + 'Upstream URL:' + color.END, pkginfo['results'][0]['URL'])
+    print(color.BOLD + 'Git Clone URL:' + color.END, 'https://mpr.makedeb.org/' + pkginfo['results'][0]['Name'] + '.git')
+    print(color.BOLD + 'Depends:' + color.END)
+    for i, depend in enumerate(pkginfo['results'][0]['Depends']):
+        if i == 5:
+            print('    ...')
+            break
+        else:
+            print(f"{color.BOLD}  - {color.END}{depend}")
+except:
+    sys.exit(1)
+EOF
+}
+
 [ "$EUID" = "0" ] && fatal 'running as root can cause problems'
 
 # check if lockfile exists
@@ -142,10 +196,16 @@ if [ "$1" = "install" ] && [ "$2" != "" ]; then
 	_install "$2";
 elif [ "$1" = "update" ]; then
 	sudo apt-get update;
+elif [ "$1" = "list" ]; then
+    dpkg -l;
 elif [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
     _remove "$2";
 elif [ "$1" = "upgrade" ]; then
     _upgrade "$2";
+elif [ "$1" = "search" ] && [ "$2" != "" ]; then
+    _search "$2";
+elif ( [ "$1" = "info" ] || [ "$1" = "show" ] ) && [ "$2" != "" ]; then
+    _info "$2";
 elif [ "$1" = "" ]; then
     _help;
 fi

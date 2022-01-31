@@ -1,7 +1,7 @@
 <div id="top"></div>
 
 <h1 align="center">Una</h1>
-<h3 align="center">v0.5.0</h3>
+<h3 align="center">v1.0.0</h3>
 
 <br>
 
@@ -12,7 +12,7 @@
 [![MIT License][license-shield]][license-url]
 
   <p align="center">
-    A simple MPR helper.
+    A complete MPR helper.
     <br>
     <a href="https://github.com/AFK-OS/una/wiki"><strong>Explore the docs »</strong></a>
     <br>
@@ -23,7 +23,7 @@
   </p>
 </div>
 
-Una is a really simple MPR helper (written in Bash lol). It was created since the official MPR helper, `tap` (written by `hunterwittenborn`) had issues with handling dependencies from the MPR and regular APT dependencies. Una doesn't intend to be a replacement for `tap`, but instead a simple tool which you use in place of `tap install` to install and remove packages (but I'm interested in adding other features such as package search and showing package info in future).
+Una is a complete MPR helper written in `bash` (kinda demonstrates the power of shell scripts lol). It was created since the official MPR helper, `tap` (written by `hunterwittenborn`) had issues with handling dependencies from the MPR and regular APT dependencies. Una is a replacement for `tap` which has implemented all the features present in `tap` and more.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -35,8 +35,8 @@ Una is a really simple MPR helper (written in Bash lol). It was created since th
 - [x] Support for installing and removing packages.
 - [x] Support for dependencies from the MPR.
 - [x] Support for updates.
-- [ ] Support for searching for packages.
-- [ ] Support for showing package information.
+- [x] Support for searching for packages.
+- [x] Support for showing package information.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
