@@ -10,6 +10,10 @@ fatal() {
     kill $$
 }
 
+sshell_exit() {
+    kill $$
+}
+
 info() {
     echo -e "${bold}info${normal}: $@"
 }
@@ -79,12 +83,8 @@ _install() {
 
     info "cloning ${pkgname}"
     LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
-        ( sudo apt-get install -y "${pkgname}" || (fatal "this package doesn't exist") ) || true
-    rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null || true
-
-    if LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && [ "$2" != "force" ]; then
-        return
-    fi
+        ( sudo apt-get install -y "${pkgname}" && ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null \
+        && sshell_exit || sshell_exit ) || (fatal "this package doesn't exist or an error occured") ) || true
 
     source "${pkgname}/PKGBUILD"
 
