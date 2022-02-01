@@ -60,6 +60,7 @@ _help() {
     echo "  list        List installed packages."
     echo "  info        Show package information."
     echo "  search      Search for packages."
+    echo "  help        Show the usage"
     echo
     echo "${bold}Do not use 'apt remove' or 'apt purge' on MPR packages."
     echo "The package will get reinstalled when updating if an update for it is available."
@@ -155,7 +156,7 @@ _search() {
 
     [[ ${#pkgname} -lt 2 ]] && fatal 'search string too short (the length should be greater than 1)'
 
-    CURL="$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}")"
+    CURL=$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}")
     paste <(echo "$(echo "$CURL" | jq --raw-output '.results[].Name'):") <(echo "$CURL" | jq --raw-output '.results[].Description')
 
     echo
@@ -166,7 +167,6 @@ _search() {
 _info() {
     pkgname="${1:?}"
 
-    CURL="$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=info&arg=${pkgname}")"
     python3 - "${pkgname}" <<'EOF' || ( apt-cache show "${pkgname}" 2>/dev/null || fatal "this package doesn't exist or you're not connected to a network" )
 import requests, sys, os
 
@@ -192,6 +192,7 @@ try:
     print(color.BOLD + 'Last modified:' + color.END, datetime.fromtimestamp(pkginfo['results'][0]['LastModified']))
     print(color.BOLD + 'Description:' + color.END, pkginfo['results'][0]['Description'])
     print(color.BOLD + 'Upstream URL:' + color.END, pkginfo['results'][0]['URL'])
+    print(color.BOLD + 'Version:' + color.END, pkginfo['results'][0]['Version'])
     print(color.BOLD + 'Git Clone URL:' + color.END, 'https://mpr.makedeb.org/' + pkginfo['results'][0]['Name'] + '.git')
     print(color.BOLD + 'Depends:' + color.END)
     for i, depend in enumerate(pkginfo['results'][0]['Depends']):
@@ -232,7 +233,7 @@ elif [[ "$1" == "search" ]] && [[ "$2" != "" ]]; then
     _search "$2";
 elif { [[ "$1" == "info" ]] || [[ "$1" == "show" ]]; } && [[ "$2" != "" ]]; then
     _info "$2";
-elif [[ -z "$1" ]]; then
+elif [[ -z "$1" ]] || [[ "$1" == "help" ]]; then
     _help;
 fi
 
