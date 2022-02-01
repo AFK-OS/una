@@ -29,6 +29,26 @@ Una is a complete MPR helper written in `bash` (kinda demonstrates the power of 
 
 
 
+<!-- INSTALLATION -->
+## Installation
+
+```sh
+wget -qO - 'https://proget.hunterwittenborn.com/debian-feeds/makedeb.pub' | \
+gpg --dearmor | \
+sudo tee /usr/share/keyrings/makedeb-archive-keyring.gpg &> /dev/null
+
+echo 'deb [signed-by=/usr/share/keyrings/makedeb-archive-keyring.gpg arch=all] https://proget.hunterwittenborn.com/ makedeb main' | \
+sudo tee /etc/apt/sources.list.d/makedeb.list
+
+sudo apt-get update && sudo apt-get install makedeb
+
+git clone https://mpr.makedeb.org/una-bin.git && makedeb -si
+
+sudo mkdir -p /var/lib/una
+echo "una-bin ${LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin}" | sudo tee /var/lib/una/status
+```
+
+
 <!-- ROADMAP -->
 ## Roadmap
 
