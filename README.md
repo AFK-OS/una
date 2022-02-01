@@ -57,7 +57,7 @@ echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)"
 - [x] Support for updates.
 - [x] Support for searching for packages.
 - [x] Support for showing package information.
-- [ ] Support for auto-completions.
+- [x] Support for auto-completions.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
