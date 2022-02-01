@@ -6,7 +6,7 @@ normal="$(tput sgr0)"
 set -e
 
 fatal() {
-    echo -e "${bold}fatal error${normal}: $@"
+    echo -e "${bold}fatal error${normal}: $*"
     kill $$
 }
 
@@ -15,7 +15,7 @@ sshell_exit() {
 }
 
 info() {
-    echo -e "${bold}info${normal}: $@"
+    echo -e "${bold}info${normal}: $*"
 }
 
 trim_string() {
@@ -69,9 +69,9 @@ _help() {
 _install() {
     sudo mkdir -p /var/lib/una
 
-    pkgname="$1"
+    pkgname="${1:?}"
 
-    if [ "$2" != "force" ]; then
+    if [[ "$2" != "force" ]]; then
         LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
             fatal "${pkgname} is already installed"
         ) || true
@@ -86,9 +86,9 @@ _install() {
         ( sudo apt-get install -y "${pkgname}" && ( ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; \
         touch "/tmp/${pkgname}.lock" ) || true ) || fatal "this package doesn't exist or an error occured" ) || true
 
-    if [ "$2" != "force" ]; then
+    if [[ "$2" != "force" ]]; then
         LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
-    elif [ "$2" == "force" ] && [[ -f "/tmp/${pkgname}.lock" ]]; then
+    elif [[ "$2" == "force" ]] && [[ -f "/tmp/${pkgname}.lock" ]]; then
         rm -f "/tmp/${pkgname}.lock"; return;
     fi
 
@@ -98,23 +98,23 @@ _install() {
 
     new_optdepends=()
     for depend in "${optdepends[@]}"; do
-        new_optdepends+=( $(echo "${depend}" | cut -d':' -f1) )
+        new_optdepends+=( "${depend%:*}")
     done
 
     source /etc/os-release
     codename_depends="${VERSION_CODENAME}_depends"
     codename_makedepends="${VERSION_CODENAME}_makedepends"
-    [ "${!codename_depends}" != "" ] && eval "depends=(\${$codename_depends[*]})"
-    [ "${!codename_makedepends}" != "" ] && eval "makedepends=(\${$codename_makedepends[*]})"
+    [[ "${!codename_depends}" != "" ]] && eval "depends=(\${$codename_depends[*]})"
+    [[ "${!codename_makedepends}" != "" ]] && eval "makedepends=(\${$codename_makedepends[*]})"
 
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${new_optdepends[@]}"; do
         dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || _install "$depend"
         sudo apt-mark auto "$depend" &>/dev/null
-        pkgname="$1"
+        pkgname="${1:?}"
     done
 
-    pkgname="$1"
+    pkgname="${1:?}"
 
     echo "building ${pkgname}"
     cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -i
@@ -126,7 +126,7 @@ _install() {
 }
 
 _upgrade() {
-    if [ "$1" != "" ]; then
+    if [[ "$1" != "" ]]; then
         _install "$1" force; return;
     fi
 
@@ -140,7 +140,7 @@ _upgrade() {
 }
 
 _remove() {
-    pkgname="$1"
+    pkgname="${1:?}"
 
     sudo apt-get purge -y "${pkgname}"
 
@@ -149,14 +149,14 @@ _remove() {
 }
 
 _search() {
-    pkgname="$1"
+    pkgname="${1:?}"
 
     info 'showing MPR packages'
 
-    [ ${#pkgname} -lt 2 ] && fatal 'search string too short (the length should be greater than 1)'
+    [[ ${#pkgname} -lt 2 ]] && fatal 'search string too short (the length should be greater than 1)'
 
-    CURL=$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}")
-    paste <(echo "$(echo "$CURL" | jq --raw-output '.results[].Name'):") <(echo $CURL | jq --raw-output '.results[].Description')
+    CURL="$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}")"
+    paste <(echo "$(echo "$CURL" | jq --raw-output '.results[].Name'):") <(echo "$CURL" | jq --raw-output '.results[].Description')
 
     echo
     info 'showing APT packages'
@@ -164,9 +164,9 @@ _search() {
 }
 
 _info() {
-    pkgname="$1"
+    pkgname="${1:?}"
 
-    CURL=$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=info&arg=${pkgname}")
+    CURL="$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=info&arg=${pkgname}")"
     python3 - "${pkgname}" <<'EOF' || ( apt-cache show "${pkgname}" 2>/dev/null || fatal "this package doesn't exist or you're not connected to a network" )
 import requests, sys, os
 
@@ -205,36 +205,36 @@ except:
 EOF
 }
 
-[ "$EUID" = "0" ] && fatal 'running as root can cause problems'
+[[ "$EUID" == "0" ]] && fatal 'running as root can cause problems'
 
 # check if lockfile exists
 LOCKFILE=/tmp/una.lock
-if [ -e /tmp/una.lock ] && kill -0 $(cat "${LOCKFILE}"); then
+if [[ -e /tmp/una.lock ]] && kill -0 "$(cat "${LOCKFILE}")"; then
     fatal "already running as PID $(cat "${LOCKFILE}")"
     exit
 fi
 
 # create lockfile
-trap "rm -f ${LOCKFILE}; exit" INT TERM EXIT
+trap "rm -f "${LOCKFILE:?}"; exit" INT TERM EXIT
 echo $$ > ${LOCKFILE}
 
-if [ "$1" = "install" ] && [ "$2" != "" ]; then
+if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
 	_install "$2";
-elif [ "$1" = "update" ]; then
+elif [[ "$1" == "update" ]]; then
 	sudo apt-get update;
-elif [ "$1" = "list" ]; then
+elif [[ "$1" == "list" ]]; then
     dpkg -l;
-elif [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+elif [[ "$1" == "remove" ]] || [[ "$1" == "purge" ]]; then
     _remove "$2";
-elif [ "$1" = "upgrade" ]; then
+elif [[ "$1" == "upgrade" ]]; then
     _upgrade "$2";
-elif [ "$1" = "search" ] && [ "$2" != "" ]; then
+elif [[ "$1" == "search" ]] && [[ "$2" != "" ]]; then
     _search "$2";
-elif ( [ "$1" = "info" ] || [ "$1" = "show" ] ) && [ "$2" != "" ]; then
+elif { [[ "$1" == "info" ]] || [[ "$1" == "show" ]]; } && [[ "$2" != "" ]]; then
     _info "$2";
-elif [ "$1" = "" ]; then
+elif [[ -z "$1" ]]; then
     _help;
 fi
 
 # remove lockfile
-rm -f "${LOCKFILE}"
+rm -f "${LOCKFILE:?}"
