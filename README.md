@@ -23,7 +23,7 @@
   </p>
 </div>
 
-Una is a complete MPR helper written in `bash` (kinda demonstrates the power of shell scripts lol). It was created since the official MPR helper, `tap` (written by `hunterwittenborn`) had issues with handling dependencies from the MPR and regular APT dependencies. Una is a replacement for `tap` which has implemented all the features present in `tap` and more.
+Una is a complete MPR helper written in `bash` (kinda demonstrates the power of shell scripts lol). It was created since the only other helper which is still being maintained, `tap`, had issues with handling dependencies from the MPR and regular APT dependencies. Una is a replacement for `tap` which has implemented all the features present in `tap` and more.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -37,6 +37,7 @@ Una is a complete MPR helper written in `bash` (kinda demonstrates the power of 
 - [x] Support for updates.
 - [x] Support for searching for packages.
 - [x] Support for showing package information.
+- [ ] Support for auto-completions.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
