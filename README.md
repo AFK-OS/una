@@ -45,7 +45,7 @@ sudo apt-get update && sudo apt-get install makedeb
 git clone https://mpr.makedeb.org/una-bin.git && makedeb -si
 
 sudo mkdir -p /var/lib/una
-echo "una-bin ${LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin}" | sudo tee /var/lib/una/status
+echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)" | sudo tee /var/lib/una/status
 ```
 
 
