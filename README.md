@@ -42,10 +42,13 @@ sudo tee /etc/apt/sources.list.d/makedeb.list
 
 sudo apt-get update && sudo apt-get install makedeb
 
-git clone https://mpr.makedeb.org/una-bin.git && makedeb -si
+git clone https://mpr.makedeb.org/una-bin.git && cd una-bin
+makedeb -si && cd .. && rm -rf una-bin
 
-sudo mkdir -p /var/lib/una
+una update; sudo mkdir -p /var/lib/una
 echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)" | sudo tee /var/lib/una/status
+
+una help
 ```
 
 
