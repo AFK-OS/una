@@ -60,7 +60,8 @@ _help() {
     echo "  list        List installed packages."
     echo "  info        Show package information."
     echo "  search      Search for packages."
-    echo "  help        Show the usage"
+    echo "  help        Show the usage."
+    echo "  clone       Clone a package from the MPR."
     echo
     echo "${bold}Do not use 'apt remove' or 'apt purge' on MPR packages."
     echo "The package will get reinstalled when updating if an update for it is available."
@@ -220,6 +221,15 @@ _update_command() {
     { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | sudo tee /var/lib/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
 }
 
+_clone() {
+    pkgname="$1"
+
+    [[ -d "$pkgname" ]] && { info "The directory ${pkgname} already exists. Do you want to overwrite it? (press ENTER to proceed, or ^C to exit)"; }
+    read; rm -rf "$pkgname"
+    LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
+        { rm -rf "${pkgname}"; fatal "this MPR package doesn't exist or an error occured"; } || info "Cloned the git repo"
+}
+
 [[ "$EUID" == "0" ]] && fatal 'running as root can cause problems'
 
 # check if lockfile exists
@@ -255,6 +265,8 @@ elif [[ "$1" == "updates" ]]; then
     _upgrade updates;
 elif [[ "$1" == "list" ]]; then
     dpkg -l;
+elif [[ "$1" == "clone" ]]; then
+    _clone "$2";
 elif [[ "$1" == "remove" ]] || [[ "$1" == "purge" ]]; then
     _remove "$2";
 elif [[ "$1" == "upgrade" ]]; then

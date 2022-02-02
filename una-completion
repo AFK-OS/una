@@ -13,7 +13,7 @@ _completions() {
             SUGGESTIONS+=("${pkg}")
         done
     elif [[ "$COMP_CWORD" == 2 ]] && ( [[ "${COMP_WORDS[1]}" == install ]] \
-      || [[ "${COMP_WORDS[1]}" == search ]] || [[ "${COMP_WORDS[1]}" == info ]] ); then
+      || [[ "${COMP_WORDS[1]}" == search ]] || [[ "${COMP_WORDS[1]}" == info ]] || [[ "${COMP_WORDS[1]}" == clone ]] ); then
         for pkg in $(cat /var/lib/una/cache | jq -r '.[].Name' | grep "^${COMP_WORDS[$COMP_CWORD]}" || true) $(apt-cache search --names-only "^${COMP_WORDS[$COMP_CWORD]}" 2>/dev/null | sort -d | awk '{print $1}' || true); do
             SUGGESTIONS+=("${pkg}")
         done
