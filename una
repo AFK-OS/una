@@ -26,7 +26,7 @@ trim_string() {
 }
 
 update_command() {
-    local pkg="$1"
+    local pkg="${1:?}"
 
     python3 - "${pkg}" <<'EOF'
 import requests, sys
@@ -76,9 +76,9 @@ _install() {
     pkgname="${1:?}"
 
     if [[ "$2" != "force" ]]; then
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
-            fatal "${pkgname} is already installed"
-        ) || true
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && {
+            fatal "${pkgname} is already installed";
+        } || true
     fi
 
     info 'creating build directory'
@@ -87,8 +87,8 @@ _install() {
 
     info "cloning ${pkgname}"
     LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
-        ( sudo apt-get install -y "${pkgname}" && ( ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; \
-        touch "/tmp/${pkgname}.lock" ) || true ) || fatal "this package doesn't exist or an error occured" ) || true
+        { sudo apt-get install -y "${pkgname}" && { { rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; \
+        touch "/tmp/${pkgname}.lock"; } || true; } || fatal "this package doesn't exist or an error occured"; } || true
 
     if [[ "$2" != "force" ]]; then
         LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
@@ -102,14 +102,14 @@ _install() {
 
     new_optdepends=()
     for depend in "${optdepends[@]}"; do
-        new_optdepends+=( "${depend%:*}")
+        new_optdepends+=("${depend%:*}")
     done
 
     source /etc/os-release
     codename_depends="${VERSION_CODENAME}_depends"
     codename_makedepends="${VERSION_CODENAME}_makedepends"
-    [[ "${!codename_depends}" != "" ]] && eval "depends=(\${$codename_depends[*]})"
-    [[ "${!codename_makedepends}" != "" ]] && eval "makedepends=(\${$codename_makedepends[*]})"
+    [[ "${!codename_depends}" != "" ]] && eval "depends=(\${${codename_depends[*]}})"
+    [[ "${!codename_makedepends}" != "" ]] && eval "makedepends=(\${${codename_makedepends[*]}})"
 
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${new_optdepends[@]}"; do
@@ -249,7 +249,7 @@ if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || [[ ! -f '/
     sudo touch /var/lib/una/status /var/lib/una/cache
     echo
     info 'looks like you are a new user'
-    info "run una update every once in a while to update una's package cache"
+    info "run ${bold}una update${normal} every once in a while to update una's package cache"
     info "you might face issues if it's outdated"
     echo && sleep 3
 
