@@ -73,32 +73,49 @@ _help() {
 _install() {
     sudo mkdir -p /var/lib/una
 
-    pkgname="${1:?}"
+    local pkgname="${1:?}"
 
     if [[ "$2" != "force" ]]; then
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && (
-            fatal "${pkgname} is already installed"
-        ) || true
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && {
+            [[ "$3" == git ]] && return || fatal "${pkgname} is already installed";
+        } || true
     fi
 
     info 'creating build directory'
     rm -rf "${HOME}/.cache/una/pkgs/${pkgname}" "${HOME}/.cache/una/pkgs/${pkgname}-git"
     mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
 
-    info "cloning ${pkgname}"
-    LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
-        { LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}-git.git" 2>&1 | grep -q 'empty repository' && \
-            ( sudo apt-get install -y "${pkgname}" && ( ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; \
-            touch "/tmp/${pkgname}.lock" ) || true ) || fatal "this package doesn't exist or an error occured" ) || pkgname="${pkgname}-git"; } \
-        || fatal 'something went wrong'
+    if [[ "$3" == "git" ]]; then
+        info "cloning ${pkgname}"
+        LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' \
+            && fatal "this package doesn't exist" || true
+    else
+        force="$2"
 
-    if [[ "$2" != "force" ]]; then
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
-    elif [[ "$2" == "force" ]] && [[ -f "/tmp/${pkgname}.lock" ]]; then
-        rm -f "/tmp/${pkgname}.lock"; return;
+        info "cloning ${pkgname}"
+        LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' \
+            && { { apt-cache show "${pkgname}" &>/dev/null && sudo apt-get install -y "${pkgname}"; } \
+            && { { rm -rf "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; touch "/tmp/${pkgname}.lock"; } } \
+            || { _install "${pkgname}-git" "$force" git; }; return; } \
+            || true
+
+        if [[ "$force" != "force" ]]; then
+            LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
+            LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed" && return || true;
+        elif [[ "$2" == "force" ]] && [[ -f "/tmp/${pkgname}.lock" ]]; then
+            rm -f "/tmp/${pkgname}.lock"; return;
+        fi
     fi
 
-    rm -f "/tmp/${pkgname}.lock"
+    source /etc/os-release
+
+    depends=()
+    makedepends=()
+    checkdepends=()
+    codename_depends="${VERSION_CODENAME}_depends"
+    codename_makedepends="${VERSION_CODENAME}_makedepends"
+    eval "${codename_depends}=()"
+    eval "${codename_makedepends}=()"
 
     source "${pkgname}/PKGBUILD"
 
@@ -107,23 +124,21 @@ _install() {
     #     new_optdepends+=( "${depend%:*}")
     # done
 
-    source /etc/os-release
     codename_depends="${VERSION_CODENAME}_depends"
     codename_makedepends="${VERSION_CODENAME}_makedepends"
     [[ "${!codename_depends}" != "" ]] && eval "depends=(\${$codename_depends[*]})"
     [[ "${!codename_makedepends}" != "" ]] && eval "makedepends=(\${$codename_makedepends[*]})"
 
+    echo "${pkgname}/PKGBUILD"
+
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}"; do # "${new_optdepends[@]}"; do
-        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || _install "$depend"
-        sudo apt-mark auto "$depend" &>/dev/null
-        pkgname="${1:?}"
+        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || { _install "$depend"; }
     done
 
-    pkgname="${1:?}"
-
     echo "building ${pkgname}"
-    cd "${HOME}/.cache/una/pkgs/${pkgname}" && makedeb -i
+    cd "${HOME}/.cache/una/pkgs/${pkgname}" && ( makedeb -s || fatal 'an error occurred when building the package' )
+    for pkg in ./*.deb; do sudo apt-get install -y --no-install-recommends "$pkg" || fatal 'an error occurred when installing the package'; done
 
     sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
     grep -q "^${pkgname} " /var/lib/una/status && grep -v "^${pkgname} " /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
@@ -205,12 +220,15 @@ try:
     print(color.BOLD + 'Version:' + color.END, pkginfo['results'][0]['Version'])
     print(color.BOLD + 'Git Clone URL:' + color.END, 'https://mpr.makedeb.org/' + pkginfo['results'][0]['Name'] + '.git')
     print(color.BOLD + 'Depends:' + color.END)
-    for i, depend in enumerate(pkginfo['results'][0]['Depends']):
-        if i == 5:
-            print('    ...')
-            break
-        else:
-            print(f"{color.BOLD}  - {color.END}{depend}")
+    try:
+        for i, depend in enumerate(pkginfo['results'][0]['Depends']):
+            if i == 5:
+                print('    ...')
+                break
+            else:
+                print(f"{color.BOLD}  - {color.END}{depend}")
+    except:
+        print()
 except:
     sys.exit(1)
 EOF
