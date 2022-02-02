@@ -1,0 +1,6 @@
+[Desktop File]
+# This file should be placed in autostart
+Name=Una Updater
+Exec=una-updater
+Type=Application
+X-GNOME-Autostart-enabled=true

@@ -1,7 +1,7 @@
 <div id="top"></div>
 
 <h1 align="center">Una</h1>
-<h3 align="center">v1.1.0</h3>
+<h3 align="center">v1.1.1</h3>
 
 <br>
 
@@ -61,6 +61,7 @@ una help
 - [x] Support for searching for packages.
 - [x] Support for showing package information.
 - [x] Support for auto-completions.
+- [x] Auto updater.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

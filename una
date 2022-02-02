@@ -129,17 +129,22 @@ _install() {
 }
 
 _upgrade() {
-    if [[ "$1" != "" ]]; then
+    if [[ "$1" == "force" ]]; then
         _install "$1" force; return;
     fi
 
-    info 'upgrading MPR packages'
+    [[ "$1" == "updates" ]] || info 'upgrading MPR packages'
     grep -v '^$' /var/lib/una/status | while IFS= read -r line; do
+        [[ $(update_command "$line") == "" ]] && continue
+        [[ "$1" == "updates" ]] && update_command "$line" || true
+        [[ "$1" == "updates" ]] && continue || true
         $(update_command "$line")
     done
+    [[ "$1" == "updates" ]] && return || true
+
     echo
     info 'upgrading APT packages'
-    sudo apt upgrade -y
+    sudo apt-get upgrade -y
 }
 
 _remove() {
@@ -228,9 +233,17 @@ fi
 trap "rm -f "${LOCKFILE:?}"; exit" INT TERM EXIT
 echo $$ > ${LOCKFILE}
 
-if [[ ! -d '/var/lib/una' ]]; then
+if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || [[ ! -f '/var/lib/una/cache' ]]; }; then
     info 'creating una directory'
     sudo mkdir -p /var/lib/una
+    sudo touch /var/lib/una/status /var/lib/una/cache
+    echo
+    info 'looks like you are a new user'
+    info "run una update every once in a while to update una's package cache"
+    info "you might face issues if it's outdated"
+    echo && sleep 3
+
+    _update_command
     echo
 fi
 
@@ -238,6 +251,8 @@ if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
 	_install "$2";
 elif [[ "$1" == "update" ]]; then
 	_update_command;
+elif [[ "$1" == "updates" ]]; then
+    _upgrade updates;
 elif [[ "$1" == "list" ]]; then
     dpkg -l;
 elif [[ "$1" == "remove" ]] || [[ "$1" == "purge" ]]; then
