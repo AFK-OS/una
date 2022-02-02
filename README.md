@@ -1,7 +1,7 @@
 <div id="top"></div>
 
 <h1 align="center">Una</h1>
-<h3 align="center">v1.1.2</h3>
+<h3 align="center">v1.1.3</h3>
 
 <br>
 
@@ -64,6 +64,7 @@ una help
 - [x] Support for cloning packages from the MPR, separate from installation.
 - [x] Auto updater.
 - [x] Implement all the features listed on https://docs.makedeb.org/mpr/list-of-mpr-helpers/.
+- [x] Install `-git` package if main package doesn't exist.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

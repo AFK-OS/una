@@ -82,13 +82,15 @@ _install() {
     fi
 
     info 'creating build directory'
-    rm -rf "${HOME}/.cache/una/pkgs/${pkgname}"
+    rm -rf "${HOME}/.cache/una/pkgs/${pkgname}" "${HOME}/.cache/una/pkgs/${pkgname}-git"
     mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
 
     info "cloning ${pkgname}"
     LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
-        ( sudo apt-get install -y "${pkgname}" && ( ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; \
-        touch "/tmp/${pkgname}.lock" ) || true ) || fatal "this package doesn't exist or an error occured" ) || true
+        { LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}-git.git" 2>&1 | grep -q 'empty repository' && \
+            ( sudo apt-get install -y "${pkgname}" && ( ( rmdir "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; \
+            touch "/tmp/${pkgname}.lock" ) || true ) || fatal "this package doesn't exist or an error occured" ) || pkgname="${pkgname}-git"; } \
+        || fatal 'something went wrong'
 
     if [[ "$2" != "force" ]]; then
         LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
