@@ -102,10 +102,10 @@ _install() {
 
     source "${pkgname}/PKGBUILD"
 
-    new_optdepends=()
-    for depend in "${optdepends[@]}"; do
-        new_optdepends+=( "${depend%:*}")
-    done
+    # new_optdepends=()
+    # for depend in "${optdepends[@]}"; do
+    #     new_optdepends+=( "${depend%:*}")
+    # done
 
     source /etc/os-release
     codename_depends="${VERSION_CODENAME}_depends"
@@ -114,7 +114,7 @@ _install() {
     [[ "${!codename_makedepends}" != "" ]] && eval "makedepends=(\${$codename_makedepends[*]})"
 
     info "installing dependencies of ${pkgname}"
-    for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}" "${new_optdepends[@]}"; do
+    for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}"; do # "${new_optdepends[@]}"; do
         dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || _install "$depend"
         sudo apt-mark auto "$depend" &>/dev/null
         pkgname="${1:?}"
