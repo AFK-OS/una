@@ -267,6 +267,8 @@ if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || [[ ! -f '/
     info 'creating una directory'
     sudo mkdir -p /var/lib/una
     sudo touch /var/lib/una/status /var/lib/una/cache
+    grep -q '^una-bin ' /var/lib/una/status 2>/dev/null || \
+        { echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)" | sudo tee /var/lib/una/status &>/dev/null; }
     echo
     info 'looks like you are a new user'
     info "run una update every once in a while to update una's package cache"

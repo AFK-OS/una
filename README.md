@@ -46,8 +46,6 @@ git clone https://mpr.makedeb.org/una-bin.git && cd una-bin
 makedeb -si && cd .. && rm -rf una-bin
 
 una update; sudo mkdir -p /var/lib/una
-echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)" | sudo tee /var/lib/una/status
-
 una help
 ```
 
