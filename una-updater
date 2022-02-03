@@ -1,6 +1,8 @@
 #!/bin/bash
 
 _ui() {
+    pkexec una update || true
+
     if [[ "$(/usr/lib/update-notifier/apt-check -p 2>&1)" == "" ]] && [[ "$(una updates 2>&1)" == "" ]]; then
         return;
     fi

@@ -250,7 +250,9 @@ _clone() {
         { rm -rf "${pkgname}"; fatal "this MPR package doesn't exist or an error occured"; } || info "Cloned the git repo"
 }
 
-[[ "$EUID" == "0" ]] && fatal 'running as root can cause problems'
+if [[ "$EUID" == "0" ]] && [[ "$3" != "root" ]]; then
+    fatal 'running as root can cause problems'
+fi
 
 # check if lockfile exists
 LOCKFILE=/tmp/una.lock
