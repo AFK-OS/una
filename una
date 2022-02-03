@@ -147,8 +147,8 @@ _install() {
 }
 
 _upgrade() {
-    if [[ "$2" == "force" ]]; then
-        _install "$2" force; return;
+    if [[ "$1" != "" ]]; then
+        _install "$1" force; return;
     fi
 
     [[ "$1" == "updates" ]] || info 'upgrading MPR packages'
