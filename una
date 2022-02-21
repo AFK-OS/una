@@ -39,7 +39,7 @@ try:
 
     data = sys.argv[1]
 
-    if all_versions[all_packages.index(data.split(' ')[0])] != data.split(' ')[1]:
+    if data.split(' ')[1] not in all_versions[all_packages.index(data.split(' ')[0])]:
         print(f"_install {data.split(' ')[0]} force")
 except:
     print('')
@@ -164,7 +164,7 @@ _upgrade() {
 
     echo
     info 'upgrading APT packages'
-    sudo apt-get upgrade -y
+    sudo apt-get dist-upgrade -y --auto-remove
 }
 
 _remove() {
