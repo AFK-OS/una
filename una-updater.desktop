@@ -1,6 +1,7 @@
 [Desktop File]
 # This file should be placed in autostart
 Name=Una Updater
+Comment=Auto-updater for APT and MPR packages.
 Exec=una-updater
 Type=Application
 X-GNOME-Autostart-enabled=true

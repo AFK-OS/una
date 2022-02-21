@@ -148,7 +148,7 @@ _install() {
 }
 
 _upgrade() {
-    if [[ "$1" != "" ]]; then
+    if [[ "$1" != "" ]] && [[ "$1" != "updates" ]]; then
         _install "$1" force; return;
     fi
 
@@ -236,10 +236,15 @@ EOF
 }
 
 _update_command() {
-    info 'updating APT cache'
-    sudo apt-get update &>/dev/null || true
-    info 'updating MPR cache'
-    { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | sudo tee /var/lib/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
+    if [ "$1" == "user" ]; then
+        { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | tee ~/.cache/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
+    else
+        info 'updating APT cache'
+        sudo apt-get update &>/dev/null || true
+        info 'updating MPR cache'
+        { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | sudo tee /var/lib/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
+        { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | tee ~/.cache/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
+    fi
 }
 
 _clone() {
@@ -282,10 +287,12 @@ if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || [[ ! -f '/
     echo
 fi
 
+mkdir -p ~/.cache/una
+
 if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
 	_install "$2";
 elif [[ "$1" == "update" ]]; then
-	_update_command;
+	_update_command "$2";
 elif [[ "$1" == "updates" ]]; then
     _upgrade updates;
 elif [[ "$1" == "list" ]]; then
