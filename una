@@ -112,6 +112,7 @@ _install() {
     depends=()
     makedepends=()
     checkdepends=()
+    pkgver=""
     codename_depends="${VERSION_CODENAME}_depends"
     codename_makedepends="${VERSION_CODENAME}_makedepends"
     eval "${codename_depends}=()"
@@ -143,7 +144,7 @@ _install() {
 
     sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
     grep -q "^${pkgname} " /var/lib/una/status && grep -v "^${pkgname} " /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
-    printf "\n${pkgname} $(dpkg-query --showformat='${Version}' --show ${pkgname})" | sudo tee -a /var/lib/una/status &>/dev/null
+    printf "\n${pkgname} ${pkgver}" | sudo tee -a /var/lib/una/status &>/dev/null
     grep -v "^$" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
 
@@ -236,7 +237,7 @@ EOF
 }
 
 _update_command() {
-    if [ "$1" == "user" ]; then
+    if [[ "$1" == "user" ]]; then
         { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | tee ~/.cache/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
     else
         info 'updating APT cache'
