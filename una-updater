@@ -1,13 +1,13 @@
 #!/bin/bash
 
 _ui() {
-    ./una update user || true
+    una update user || true
 
-    if [[ "$(/usr/lib/update-notifier/apt-check -p 2>&1)" == "" ]] && [[ "$(./una updates 2>&1)" == "" ]]; then
+    if [[ "$(/usr/lib/update-notifier/apt-check -p 2>&1)" == "" ]] && [[ "$(una updates 2>&1)" == "" ]]; then
         return;
     fi
 
-    zenity --question --text 'Updated packages are available. Do you wish to upgrade?' --width 200 && x-terminal-emulator -e './una upgrade; echo; echo "You can now close this window or press ENTER to close."; read enter' &
+    zenity --question --text 'Updated packages are available. Do you wish to upgrade?' --width 200 && x-terminal-emulator -e 'una upgrade; echo; echo "You can now close this window or press ENTER to close."; read enter' &
 }
 
 while true; do _ui; sleep $(( 4 * 60 * 60 )); done
