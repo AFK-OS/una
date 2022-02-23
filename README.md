@@ -1,7 +1,7 @@
 <div id="top"></div>
 
 <h1 align="center">Una</h1>
-<h3 align="center">v1.1.9</h3>
+<h3 align="center">v1.2.0</h3>
 
 <br>
 

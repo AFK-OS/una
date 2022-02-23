@@ -3,10 +3,21 @@
 bold="$(tput bold)"
 normal="$(tput sgr0)"
 
+red=$'\e[1;31m'
+green=$'\e[1;32m'
+yellow=$'\e[1;33m'
+blue=$'\e[1;34m'
+magenta=$'\e[1;35m'
+cyan=$'\e[1;36m'
+
+version='v1.2.0'
+
 set -e
 
+echo "${cyan}una ${version}${normal}" 2>&1
+
 fatal() {
-    echo -e "${bold}fatal error${normal}: $*"
+    echo -e "${bold}${red}>>${normal}${bold} $*${normal}" 1>&2
     kill $$
 }
 
@@ -15,7 +26,20 @@ sshell_exit() {
 }
 
 info() {
-    echo -e "${bold}info${normal}: $*"
+    echo -e "${bold}${blue}>>${normal}${bold} $*${normal}"
+}
+
+_spinner() {
+    pid="$!"
+    while kill -0 "$pid" 2>/dev/null; do
+        echo -en "${bold}${blue}>>${normal}${bold} $* ${normal}" 1>&2
+        BCK=''
+        for char in ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷; do
+            echo -en "${BCK}${char}" 1>&2
+            sleep 0.1; BCK=$'\b'
+        done
+        echo -en "\033[2K\r" 1>&2
+    done
 }
 
 trim_string() {
@@ -25,29 +49,29 @@ trim_string() {
     printf '%s' "$var"
 }
 
-update_command() {
+upgrade_command() {
     local pkg="$1"
 
     python3 - "${pkg}" <<'EOF'
-import requests, sys
+import os, sys, json, requests
 
 try:
-    resp = requests.get('https://mpr.makedeb.org/packages-meta-ext-v1.json.gz')
-    paklist = resp.json()
-    all_packages = [ x["Name"] for x in paklist ]
-    all_versions = [ x["Version"] for x in paklist ]
+    with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
+        paklist = json.load(pakfile)
 
-    data = sys.argv[1]
+        all_packages = [ x["Name"] for x in paklist ]
+        all_versions = [ x["Version"] for x in paklist ]
 
-    if data.split(' ')[1] not in all_versions[all_packages.index(data.split(' ')[0])]:
-        print(f"_install {data.split(' ')[0]} force")
+        data = sys.argv[1]
+
+        if data.split(' ')[1] not in all_versions[all_packages.index(data.split(' ')[0])]:
+            print(f"_install {data.split(' ')[0]} force")
 except:
     print('')
 EOF
 }
 
 _help() {
-    echo -e "${bold}Una - a complete MPR helper${normal}"
     echo
     echo "Syntax: una <COMMAND> [PACKAGE]"
     echo
@@ -60,14 +84,12 @@ _help() {
     echo "  list        List installed packages."
     echo "  info        Show package information."
     echo "  search      Search for packages."
-    echo "  help        Show the usage."
     echo "  clone       Clone a package from the MPR."
+    echo "  help        Show the usage."
     echo
     echo "${bold}Do not use 'apt remove' or 'apt purge' on MPR packages."
     echo "The package will get reinstalled when updating if an update for it is available."
-    echo "Instead, use 'una remove' (replacement for 'apt purge' for MPR packages)."
-    echo
-    echo "Run "'`una update`'" if you're running una for the first time.${normal}"
+    echo "Instead, use 'una remove' (replacement for 'apt purge' for MPR packages).${normal}"
 }
 
 _install() {
@@ -81,14 +103,17 @@ _install() {
         } || true
     fi
 
-    info 'creating build directory'
+    echo
+    info 'clearing old build directory'
     rm -rf "${HOME}/.cache/una/pkgs/${pkgname}" "${HOME}/.cache/una/pkgs/${pkgname}-git"
+    echo
+    info 'creating build directory'
     mkdir -p ~/.cache/una/pkgs && cd ~/.cache/una/pkgs
 
     if [[ "$3" == "git" ]]; then
         info "cloning ${pkgname}"
         LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' \
-            && fatal "this package doesn't exist" || true
+            && { echo; fatal "this package doesn't exist"; } || true
     else
         force="$2"
 
@@ -155,10 +180,9 @@ _upgrade() {
 
     [[ "$1" == "updates" ]] || info 'upgrading MPR packages'
     grep -v '^$' /var/lib/una/status | while IFS= read -r line; do
-        [[ $(update_command "$line") == "" ]] && continue
-        [[ "$1" == "updates" ]] && update_command "$line" || true
-        [[ "$1" == "updates" ]] && continue || true
-        $(update_command "$line")
+        [[ $(upgrade_command "$line") == "" ]] && continue
+        [[ "$1" == "updates" ]] && upgrade_command "$line" || true
+        [[ "$1" == "updates" ]] || $(upgrade_command "$line")
     done
     [[ "$1" == "updates" ]] && return || true
 
@@ -179,16 +203,14 @@ _remove() {
 _search() {
     pkgname="${1:?}"
 
-    info 'showing MPR packages'
-
     [[ ${#pkgname} -lt 2 ]] && fatal 'search string too short (the length should be greater than 1)'
 
-    CURL=$(curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}")
-    paste <(echo "$(echo "$CURL" | jq --raw-output '.results[].Name'):") <(echo "$CURL" | jq --raw-output '.results[].Description')
+    curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}" | jq -cr ".results[] | \"${blue}\(.Name)/\(.Version) ${cyan}[MPR]${normal}\n  \(.Description)\""
 
-    echo
-    info 'showing APT packages'
-    apt-cache search "${pkgname}" 2>/dev/null
+    for pkgname in $(apt-cache pkgnames hello 2>/dev/null); do
+        echo "${blue}${pkgname}/$(LANG=C apt-cache show ${pkgname} | grep '^Version: ' | sed '0,/Version: /{s/Version: //}') ${cyan}[APT]${normal}"
+        echo "  $(LANG=C apt-cache show ${pkgname} | grep '^Description-en: ' | sed '0,/Description-en: /{s/Description-en: //}')"
+    done
 }
 
 _info() {
@@ -236,15 +258,19 @@ except:
 EOF
 }
 
-_update_command() {
+_update() {
     if [[ "$1" == "user" ]]; then
         { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | tee ~/.cache/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
     else
-        info 'updating APT cache'
-        sudo apt-get update &>/dev/null || true
-        info 'updating MPR cache'
-        { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | sudo tee /var/lib/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
-        { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | tee ~/.cache/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
+        echo
+        sudo echo -n
+        ( sudo apt-get update &>/dev/null || true; ) & _spinner 'updating APT cache'
+        tput civis
+        (
+            { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | sudo tee /var/lib/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
+            { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | tee ~/.cache/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
+        ) & _spinner 'updating MPR cache'
+        info "${bold}updated cache successfully${normal}"
     fi
 }
 
@@ -263,37 +289,49 @@ fi
 
 # check if lockfile exists
 LOCKFILE=/tmp/una.lock
-if [[ -e /tmp/una.lock ]] && kill -0 "$(cat "${LOCKFILE}")"; then
+if [[ -e /tmp/una.lock ]] && kill -0 "$(cat "${LOCKFILE}")" 2>/dev/null; then
     fatal "already running as PID $(cat "${LOCKFILE}")"
     exit
 fi
 
 # create lockfile
-trap "rm -f "${LOCKFILE:?}"; exit" INT TERM EXIT
+trap "rm -f "${LOCKFILE:?}"; tput cnorm; exit" INT TERM EXIT
 echo $$ > ${LOCKFILE}
 
-if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || [[ ! -f '/var/lib/una/cache' ]]; }; then
-    info 'creating una directory'
+if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || { [[ ! -f "$HOME/.config/autostart/una-updater.desktop" ]] || [[ ! -f '/var/lib/una/cache' ]]; } }; then
+    echo
+    info 'creating una directory and config files'
+    mkdir -p "${HOME}/.config/autostart"
+    cat <<'EOF' >"${HOME}/.config/autostart/una-updater.desktop"
+[Desktop Entry]
+Type=Application
+Exec=una-updater
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=Una Updater
+Comment=Auto-updater for APT and MPR packages.
+EOF
     sudo mkdir -p /var/lib/una
     sudo touch /var/lib/una/status /var/lib/una/cache
     grep -q '^una-bin ' /var/lib/una/status 2>/dev/null || \
         { echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)" | sudo tee /var/lib/una/status &>/dev/null; }
     echo
-    info 'looks like you are a new user'
+    info 'looks like you are a new user or una was updated'
     info "run una update every once in a while to update una's package cache"
     info "you might face issues if it's outdated"
-    echo && sleep 3
+    sleep 3
 
-    _update_command
+    _update
     echo
 fi
 
 mkdir -p ~/.cache/una
 
 if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
-	_install "$2";
+    _install "$2";
 elif [[ "$1" == "update" ]]; then
-	_update_command "$2";
+    _update "$2";
 elif [[ "$1" == "updates" ]]; then
     _upgrade updates;
 elif [[ "$1" == "list" ]]; then
@@ -305,7 +343,9 @@ elif [[ "$1" == "remove" ]] || [[ "$1" == "purge" ]]; then
 elif [[ "$1" == "upgrade" ]]; then
     _upgrade "$2";
 elif [[ "$1" == "search" ]] && [[ "$2" != "" ]]; then
-    _search "$2";
+    echo
+    tput civis; results="$(_search "$2" & _spinner ${green}searching${normal})"; tput cnorm
+    echo -e "$results" | less;
 elif { [[ "$1" == "info" ]] || [[ "$1" == "show" ]]; } && [[ "$2" != "" ]]; then
     _info "$2";
 elif [[ -z "$1" ]] || [[ "$1" == "help" ]]; then
