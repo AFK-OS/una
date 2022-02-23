@@ -3,11 +3,11 @@
 _ui() {
     una update user || true
 
-    if [[ "$(/usr/lib/update-notifier/apt-check -p 2>&1)" == "" ]] && [[ "$(una updates 2>&1)" == "" ]]; then
+    if [[ "$(/usr/lib/update-notifier/apt-check -p 2>&1)" == "" ]] && ! una updates &>/dev/null; then
         return;
     fi
 
     zenity --question --text 'Updated packages are available. Do you wish to upgrade?' --width 200 && x-terminal-emulator -e 'una upgrade; echo; echo "You can now close this window or press ENTER to close."; read enter' &
 }
 
-while true; do _ui; sleep 4h; done
+while true; do _ui; sleep 1h; done

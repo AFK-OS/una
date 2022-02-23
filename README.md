@@ -1,7 +1,7 @@
 <div id="top"></div>
 
 <h1 align="center">Una</h1>
-<h3 align="center">v1.2.0</h3>
+<h3 align="center">v1.2.1</h3>
 
 <br>
 
@@ -33,20 +33,7 @@ Una is a complete MPR helper written in `bash` (kinda demonstrates the power of 
 ## Installation
 
 ```sh
-wget -qO - 'https://proget.hunterwittenborn.com/debian-feeds/makedeb.pub' | \
-gpg --dearmor | \
-sudo tee /usr/share/keyrings/makedeb-archive-keyring.gpg &> /dev/null
-
-echo 'deb [signed-by=/usr/share/keyrings/makedeb-archive-keyring.gpg arch=all] https://proget.hunterwittenborn.com/ makedeb main' | \
-sudo tee /etc/apt/sources.list.d/makedeb.list
-
-sudo apt-get update && sudo apt-get install makedeb
-
-git clone https://mpr.makedeb.org/una-bin.git && cd una-bin
-makedeb -si && cd .. && rm -rf una-bin
-
-una update; sudo mkdir -p /var/lib/una
-una help
+bash <(curl -fsL https://github.com/AFK-OS/una/raw/main/install.sh)
 ```
 
 

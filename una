@@ -10,11 +10,11 @@ blue=$'\e[1;34m'
 magenta=$'\e[1;35m'
 cyan=$'\e[1;36m'
 
-version='v1.2.0'
+version='v1.2.1'
 
 set -e
 
-echo "${cyan}una ${version}${normal}" 2>&1
+echo "${cyan}una ${version}${normal}" 1>&2
 
 fatal() {
     echo -e "${bold}${red}>>${normal}${bold} $*${normal}" 1>&2
@@ -40,13 +40,6 @@ _spinner() {
         done
         echo -en "\033[2K\r" 1>&2
     done
-}
-
-trim_string() {
-    local var="$*"
-    var="${var#"${var%%[![:space:]]*}"}"
-    var="${var%"${var##*[![:space:]]}"}"
-    printf '%s' "$var"
 }
 
 upgrade_command() {
@@ -333,7 +326,8 @@ if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
 elif [[ "$1" == "update" ]]; then
     _update "$2";
 elif [[ "$1" == "updates" ]]; then
-    _upgrade updates;
+    updates="$(_upgrade updates)"
+    [[ -z "${updates}" ]] && exit 1 || echo "${updates}"
 elif [[ "$1" == "list" ]]; then
     dpkg -l;
 elif [[ "$1" == "clone" ]]; then
