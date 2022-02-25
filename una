@@ -10,7 +10,7 @@ blue=$'\e[1;34m'
 magenta=$'\e[1;35m'
 cyan=$'\e[1;36m'
 
-version='v2.0.0'
+version='v3.0.0'
 
 set -e
 
@@ -21,12 +21,39 @@ fatal() {
     kill $$
 }
 
+error() {
+    echo -e "${bold}${red}>>${normal}${bold} $*${normal}" 1>&2
+}
+
 sshell_exit() {
     kill $$
 }
 
 info() {
     echo -e "${bold}${blue}>>${normal}${bold} $*${normal}" 1>&2
+}
+
+yes_no() {
+    read -p "${bold}${green}>>${normal}${bold} $* ${cyan}[${blue}y/${red}n${cyan}]${normal}: " -n 1 -r -s yn
+    echo "$yn"
+}
+
+choose_option() {
+    if [[ "$#" -eq 1 ]]; then
+        echo "$1";
+        exit
+    fi
+    i=1
+    for option in "$@"; do
+        echo -e "${bold}${cyan}${i}.${normal} ${bold}${option}${normal}" 1>&2
+        ((i++))
+    done
+    optionnum=''
+    while [[ ! "$optionnum" =~ ^[0-9]+$ ]] || [[ "$optionnum" -gt "$#" ]]; do
+        read -p "${bold}${green}>>${normal}${bold} enter the option number: ${normal}" optionnum 1>&2
+    done
+    echo "${!optionnum}"
+    num='^[0-9]+$'
 }
 
 _spinner() {
@@ -59,13 +86,16 @@ try:
 
         try:
             local_version = data.split(' ')[1]
+            server_version = all_versions[all_packages.index(data.split(' ')[0])]
             local_version = local_version.split('-')[0]
+            server_version = server_version.split('-')[0]
             try:
                 local_version = local_version.split(':')[1]
+                server_version = server_version.split(':')[1]
             except:
                 print('')
-            if data.split(' ')[1] == all_versions[all_packages.index(data.split(' ')[0])]:
-                print(f"_install {data.split(' ')[0]} force")
+            if local_version != '' and local_version != server_version:
+                print(f"cmd_install {data.split(' ')[0]} force mpr")
         except:
             print('')
 except:
@@ -75,14 +105,19 @@ EOF
 
 _help() {
     echo
-    echo "Syntax: una <COMMAND> [PACKAGE]"
+    echo "Syntax: una <COMMAND> [PACKAGES]"
     echo
     echo "commands:"
     echo
     echo "  install     Install a package."
+    echo
+    echo "              --edit before a package's name to edit"
+    echo "              or view the PKGBUILD file for that package."
+    echo
     echo "  update      Update the APT and MPR cache."
     echo "  upgrade     Upgrade all installed packages."
     echo "  remove      Remove a package."
+    echo "  autoremove  Remove auto-installed deps which are no longer required."
     echo "  list        List installed packages."
     echo "  info        Show package information."
     echo "  search      Search for packages."
@@ -94,12 +129,6 @@ _install() {
     sudo mkdir -p /var/lib/una
 
     local pkgname="${1:?}"
-
-    if [[ "$2" != "force" ]]; then
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && {
-            [[ "$3" == git ]] && return || fatal "${pkgname} is already installed";
-        } || true
-    fi
 
     echo
     info 'clearing old build directory'
@@ -115,12 +144,7 @@ _install() {
     else
         force="$2"
 
-        info "cloning ${pkgname}"
-        LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' \
-            && { { apt-cache show "${pkgname}" &>/dev/null && sudo apt-get install -y "${pkgname}"; } \
-            && { { rm -rf "${HOME}/.cache/una/pkgs/${pkgname}" &>/dev/null; touch "/tmp/${pkgname}.lock"; } } \
-            || { _install "${pkgname}-git" "$force" git; }; return; } \
-            || true
+        LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" &>/dev/null & _spinner "cloning ${pkgname}"
 
         if [[ "$force" != "force" ]]; then
             LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
@@ -141,12 +165,12 @@ _install() {
     eval "${codename_depends}=()"
     eval "${codename_makedepends}=()"
 
-    source "${pkgname}/PKGBUILD"
+    if [[ "${EDIT}" == "true" ]]; then
+        { sensible-editor "${pkgname}"/PKGBUILD || nano "${pkgname}"/PKGBUILD; } || vi "${pkgname}"/PKGBUILD
+        unset EDIT
+    fi
 
-    # new_optdepends=()
-    # for depend in "${optdepends[@]}"; do
-    #     new_optdepends+=( "${depend%:*}")
-    # done
+    source "${pkgname}/PKGBUILD"
 
     codename_depends="${VERSION_CODENAME}_depends"
     codename_makedepends="${VERSION_CODENAME}_makedepends"
@@ -156,20 +180,26 @@ _install() {
     echo
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}"; do # "${new_optdepends[@]}"; do
-        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || { _install "$depend"; }
+        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || { cmd_install "$depend" depend; }
     done
+
+    pkgname="${1:?}"
 
     echo
     info "building ${pkgname}"
     echo
-    cd "${HOME}/.cache/una/pkgs/${pkgname}" && ( makedeb -H "MPR-Package: ${pkgname}" -H "MPR-Version: ${pkgver}" -s || fatal 'an error occurred when building the package' )
-    LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && re='re' || true
-    for pkg in ./$pkgname*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || fatal 'an error occurred when installing the package'; done
+    cd "${HOME}/.cache/una/pkgs/${pkgname}" && { makedeb -H "MPR-Package: ${pkgname}" -H "MPR-Version: ${pkgver}" -s 2>/dev/null \
+        || { makedeb -H "MPR-Version: ${pkgver}" -s 2>/dev/null || { makedeb -s || fatal 'an error occurred when building the package'; }; }; }
+    if [[ "$2" == "depend" ]]; then
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null || mark=auto
+    fi
+    for pkg in ./$pkgname_*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || fatal 'an error occurred when installing the package'; done
+    [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
 }
 
 _upgrade() {
     if [[ "$1" != "" ]] && [[ "$1" != "updates" ]]; then
-        _install "$1" force; return;
+        cmd_install "$1" force; return;
     fi
 
     [[ "$1" == "updates" ]] || info 'upgrading MPR packages'
@@ -279,6 +309,107 @@ _status_file_update() {
     LC_ALL=C dpkg-query -W --showformat='${MPR-Package} ${MPR-Version}\n' | sed -r '/^\s*$/d' | sudo tee /var/lib/una/status &>/dev/null
 }
 
+cmd_install() {
+    local pkgname="${1:?}"
+    
+    if [[ "$2" == "depend" ]]; then
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed" && return || true
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-bin" 2>/dev/null | grep -q "ok installed" && return || true
+    fi
+
+    if [[ "$2" != "force" ]]; then
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && fatal "${pkgname} is already installed" || true
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed" && fatal "${pkgname} is already installed" || true
+        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-bin" 2>/dev/null | grep -q "ok installed" && fatal "${pkgname} is already installed" || true
+    fi
+
+    sources=()
+
+    apt-cache show "${pkgname}" &>/dev/null && sources+=(apt)
+
+    sources+=($(python3 - "${pkgname}" <<'EOF'
+import requests, json, sys, os
+
+try:
+    with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
+        paklist = json.load(pakfile)
+
+        all_packages = [ x["Name"] for x in paklist ]
+        
+        if sys.argv[1] in all_packages:
+            print('mpr')
+        else:
+            sys.exit()
+except:
+    sys.exit()
+EOF
+    ))
+
+    sources+=($(python3 - "${pkgname}" <<'EOF'
+import requests, json, sys, os
+
+try:
+    with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
+        paklist = json.load(pakfile)
+
+        all_packages = [ x["Name"] for x in paklist ]
+
+        if sys.argv[1] + '-git' in all_packages:
+            print('mpr-git')
+        else:
+            sys.exit()
+except:
+    sys.exit()
+EOF
+    ))
+
+    sources+=($(python3 - "${pkgname}" <<'EOF'
+import requests, json, sys, os
+
+try:
+    with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
+        paklist = json.load(pakfile)
+
+        all_packages = [ x["Name"] for x in paklist ]
+        
+        if sys.argv[1] + '-bin' in all_packages:
+            print('mpr-bin')
+        else:
+            sys.exit()
+except:
+    sys.exit()
+EOF
+    ))
+    [[ "$2" == "force" ]] && local re=re
+    [[ "$2" == "force" ]] && local opt=force
+    [[ "$2" == "depend" ]] && local opt=depend
+    if [[ "$3" == "mpr" ]]; then
+        _install "$pkgname" $opt
+    else
+        echo
+        info "select the source from which ${pkgname} should be installed"
+        case "$(choose_option "${sources[@]}")" in
+            apt)
+                if [[ "$2" == "depend" ]]; then
+                    LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null || mark=auto
+                fi
+                sudo apt-get "${re}install" -y "$pkgname"
+                [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
+                ;;
+            mpr)
+                _install "$pkgname" $opt
+                ;;
+            mpr-git)
+                _install "${pkgname}-git" $opt
+                ;;
+            mpr-bin)
+                _install "${pkgname}-bin" $opt
+                ;;
+        esac
+    fi
+}
+
 if [[ "$EUID" == "0" ]] && [[ "$3" != "root" ]]; then
     fatal 'running as root can cause problems'
 fi
@@ -321,7 +452,7 @@ EOF
     _update
 fi
 
-if ! { [[ "$1" == "updates" ]] || { [[ "$1" == update ]] && [[ "$2" == user ]]; }; }; then
+if ! { [[ "$1" == "updates" ]] || { [[ "$1" == update ]] && [[ "$2" == user ]]; } || { [[ "$1" == help ]] || [[ "$1" == "" ]]; }; }; then
     sudo echo -n
     _status_file_update & _spinner 'updating MPR status'
 fi
@@ -329,7 +460,13 @@ fi
 mkdir -p ~/.cache/una
 
 if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
-    for app in "${@:2}"; do _install "$app"; done
+    for app in "${@:2}"; do
+        if [[ "$app" == --edit ]]; then
+            export EDIT="true"
+        else
+            cmd_install "$app"
+        fi
+    done
 elif [[ "$1" == "update" ]]; then
     _update "$2";
 elif [[ "$1" == "updates" ]]; then
@@ -337,12 +474,16 @@ elif [[ "$1" == "updates" ]]; then
     [[ -z "${updates}" ]] && exit 1 || echo "${updates}"
 elif [[ "$1" == "list" ]]; then
     dpkg -l;
+elif [[ "$1" == "autoremove" ]]; then
+    sudo apt-get autoremove --purge;
 elif [[ "$1" == "clone" ]]; then
     _clone "$2";
 elif [[ "$1" == "remove" ]] || [[ "$1" == "purge" ]]; then
     for app in "${@:2}"; do _remove "$app"; done
 elif [[ "$1" == "upgrade" ]]; then
-    for app in "${@:2}"; do _upgrade "$app"; done
+    apps_i=0
+    for app in "${@:2}"; do _upgrade "$app"; ((apps_i++)); done
+    [[ "$apps_i" == 0 ]] && _upgrade || true
 elif [[ "$1" == "search" ]] && [[ "$2" != "" ]]; then
     echo
     tput civis; results="$(_search "$2" & _spinner ${green}searching${normal})"; tput cnorm
