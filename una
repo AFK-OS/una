@@ -136,6 +136,12 @@ _install() {
     eval "${codename_depends}=()"
     eval "${codename_makedepends}=()"
 
+    if [[ "${EDIT}" == "true" ]]; then
+        "${EDITOR:-$VISUAL}" "${pkgname}"/PKGBUILD || {
+            fatal 'could not edit PKGBUILD'
+        }
+    fi
+
     source "${pkgname}/PKGBUILD"
 
     # new_optdepends=()
@@ -322,6 +328,10 @@ fi
 mkdir -p ~/.cache/una
 
 if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
+    if [[ "$2" == "--edit" ]]; then
+        export EDIT=true
+        shift
+    fi
     _install "$2";
 elif [[ "$1" == "update" ]]; then
     _update "$2";
