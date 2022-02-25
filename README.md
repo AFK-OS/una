@@ -1,7 +1,7 @@
 <div id="top"></div>
 
 <h1 align="center">Una</h1>
-<h3 align="center">v1.2.1</h3>
+<h3 align="center">v2.0.0</h3>
 
 <br>
 
@@ -50,6 +50,8 @@ bash <(curl -fsL https://github.com/AFK-OS/una/raw/main/install.sh)
 - [x] Auto updater.
 - [x] Implement all the features listed on https://docs.makedeb.org/mpr/list-of-mpr-helpers/.
 - [x] Install `-git` package if main package doesn't exist.
+- [x] Compatibility with other MPR helpers.
+- [x] Support for installing multiple packages together.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

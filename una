@@ -10,7 +10,7 @@ blue=$'\e[1;34m'
 magenta=$'\e[1;35m'
 cyan=$'\e[1;36m'
 
-version='v1.2.1'
+version='v2.0.0'
 
 set -e
 
@@ -26,7 +26,7 @@ sshell_exit() {
 }
 
 info() {
-    echo -e "${bold}${blue}>>${normal}${bold} $*${normal}"
+    echo -e "${bold}${blue}>>${normal}${bold} $*${normal}" 1>&2
 }
 
 _spinner() {
@@ -57,8 +57,17 @@ try:
 
         data = sys.argv[1]
 
-        if data.split(' ')[1] not in all_versions[all_packages.index(data.split(' ')[0])]:
-            print(f"_install {data.split(' ')[0]} force")
+        try:
+            local_version = data.split(' ')[1]
+            local_version = local_version.split('-')[0]
+            try:
+                local_version = local_version.split(':')[1]
+            except:
+                print('')
+            if data.split(' ')[1] == all_versions[all_packages.index(data.split(' ')[0])]:
+                print(f"_install {data.split(' ')[0]} force")
+        except:
+            print('')
 except:
     print('')
 EOF
@@ -79,10 +88,6 @@ _help() {
     echo "  search      Search for packages."
     echo "  clone       Clone a package from the MPR."
     echo "  help        Show the usage."
-    echo
-    echo "${bold}Do not use 'apt remove' or 'apt purge' on MPR packages."
-    echo "The package will get reinstalled when updating if an update for it is available."
-    echo "Instead, use 'una remove' (replacement for 'apt purge' for MPR packages).${normal}"
 }
 
 _install() {
@@ -148,22 +153,18 @@ _install() {
     [[ "${!codename_depends}" != "" ]] && eval "depends=(\${$codename_depends[*]})"
     [[ "${!codename_makedepends}" != "" ]] && eval "makedepends=(\${$codename_makedepends[*]})"
 
-    echo "${pkgname}/PKGBUILD"
-
+    echo
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}"; do # "${new_optdepends[@]}"; do
         dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || { _install "$depend"; }
     done
 
-    echo "building ${pkgname}"
-    cd "${HOME}/.cache/una/pkgs/${pkgname}" && ( makedeb -s || fatal 'an error occurred when building the package' )
+    echo
+    info "building ${pkgname}"
+    echo
+    cd "${HOME}/.cache/una/pkgs/${pkgname}" && ( makedeb -H "MPR-Package: ${pkgname}" -H "MPR-Version: ${pkgver}" -s || fatal 'an error occurred when building the package' )
     LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && re='re' || true
     for pkg in ./$pkgname*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || fatal 'an error occurred when installing the package'; done
-
-    sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
-    grep -q "^${pkgname} " /var/lib/una/status && grep -v "^${pkgname} " /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
-    printf "\n${pkgname} ${pkgver}" | sudo tee -a /var/lib/una/status &>/dev/null
-    grep -v "^$" /var/lib/una/status 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
 
 _upgrade() {
@@ -188,9 +189,6 @@ _remove() {
     pkgname="${1:?}"
 
     sudo apt-get purge -y "${pkgname}"
-
-    sudo touch /var/lib/una/status && sudo cp /var/lib/una/status /var/lib/una/status.old
-    grep -q "^${pkgname} " /var/lib/una/status && grep -v "^${pkgname} " /var/lib/una/status 2>/dev/null | grep -v "^$" 2>/dev/null | sudo tee /var/lib/una/status &>/dev/null
 }
 
 _search() {
@@ -234,7 +232,7 @@ try:
     print(color.BOLD + 'Last modified:' + color.END, datetime.fromtimestamp(pkginfo['results'][0]['LastModified']))
     print(color.BOLD + 'Description:' + color.END, pkginfo['results'][0]['Description'])
     print(color.BOLD + 'Upstream URL:' + color.END, pkginfo['results'][0]['URL'])
-    print(color.BOLD + 'Version:' + color.END, pkginfo['results'][0]['Version'])
+    print(color.BOLD + 'Latest Version:' + color.END, pkginfo['results'][0]['Version'])
     print(color.BOLD + 'Git Clone URL:' + color.END, 'https://mpr.makedeb.org/' + pkginfo['results'][0]['Name'] + '.git')
     print(color.BOLD + 'Depends:' + color.END)
     try:
@@ -274,6 +272,11 @@ _clone() {
     read; rm -rf "$pkgname"
     LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
         { rm -rf "${pkgname}"; fatal "this MPR package doesn't exist or an error occured"; } || info "Cloned the git repo"
+}
+
+_status_file_update() {
+    sudo cp /var/lib/una/status /var/lib/una/status.old
+    LC_ALL=C dpkg-query -W --showformat='${MPR-Package} ${MPR-Version}\n' | sed -r '/^\s*$/d' | sudo tee /var/lib/una/status &>/dev/null
 }
 
 if [[ "$EUID" == "0" ]] && [[ "$3" != "root" ]]; then
@@ -316,13 +319,17 @@ EOF
     sleep 3
 
     _update
-    echo
+fi
+
+if ! { [[ "$1" == "updates" ]] || { [[ "$1" == update ]] && [[ "$2" == user ]]; }; }; then
+    sudo echo -n
+    _status_file_update & _spinner 'updating MPR status'
 fi
 
 mkdir -p ~/.cache/una
 
 if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
-    _install "$2";
+    for app in "${@:2}"; do _install "$app"; done
 elif [[ "$1" == "update" ]]; then
     _update "$2";
 elif [[ "$1" == "updates" ]]; then
@@ -333,9 +340,9 @@ elif [[ "$1" == "list" ]]; then
 elif [[ "$1" == "clone" ]]; then
     _clone "$2";
 elif [[ "$1" == "remove" ]] || [[ "$1" == "purge" ]]; then
-    _remove "$2";
+    for app in "${@:2}"; do _remove "$app"; done
 elif [[ "$1" == "upgrade" ]]; then
-    _upgrade "$2";
+    for app in "${@:2}"; do _upgrade "$app"; done
 elif [[ "$1" == "search" ]] && [[ "$2" != "" ]]; then
     echo
     tput civis; results="$(_search "$2" & _spinner ${green}searching${normal})"; tput cnorm
