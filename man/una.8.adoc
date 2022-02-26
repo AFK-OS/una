@@ -45,6 +45,6 @@ Issues, as well as feature requests, should be posted on the project's GitHub pa
 `+https://github.com/AFK-OS/una+`
 
 == AUTHORS
-Rudra Saraswat `+<ruds@ruds.io+`
+Rudra Saraswat `+<ruds@ruds.io>+`
 
 A full list of contributors can be found by running *git shortlog -esn* on una’s Git repository (linked under *BUGS*).

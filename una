@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# una - a complete mpr helper
+# Copyright (C) 2022  Rudra Saraswat
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 bold="$(tput bold)"
 normal="$(tput sgr0)"
 
@@ -10,7 +26,7 @@ blue=$'\e[1;34m'
 magenta=$'\e[1;35m'
 cyan=$'\e[1;36m'
 
-version='v3.0.0'
+version='v3.1.0'
 
 set -e
 
@@ -147,10 +163,10 @@ _install() {
         LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" &>/dev/null & _spinner "cloning ${pkgname}"
 
         if [[ "$force" != "force" ]]; then
-            LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true;
-            LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed" && return || true;
+            LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return 0 || true;
+            LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed" && return 0 || true;
         elif [[ "$2" == "force" ]] && [[ -f "/tmp/${pkgname}.lock" ]]; then
-            rm -f "/tmp/${pkgname}.lock"; return;
+            rm -f "/tmp/${pkgname}.lock"; return 0;
         fi
     fi
 
@@ -189,17 +205,17 @@ _install() {
     info "building ${pkgname}"
     echo
     cd "${HOME}/.cache/una/pkgs/${pkgname}" && { makedeb -H "MPR-Package: ${pkgname}" -H "MPR-Version: ${pkgver}" -s 2>/dev/null \
-        || { makedeb -H "MPR-Version: ${pkgver}" -s 2>/dev/null || { makedeb -s || fatal 'an error occurred when building the package'; }; }; }
+        || { makedeb -H "MPR-Version: ${pkgver}" -s 2>/dev/null || { makedeb -s || { error 'an error occurred when building the package'; return 1; } }; }; }
     if [[ "$2" == "depend" ]]; then
         LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null || mark=auto
     fi
-    for pkg in ./$pkgname_*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || fatal 'an error occurred when installing the package'; done
+    for pkg in ./$pkgname_*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || { error 'an error occurred when building the package'; return 1; }; done
     [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
 }
 
 _upgrade() {
     if [[ "$1" != "" ]] && [[ "$1" != "updates" ]]; then
-        cmd_install "$1" force; return;
+        cmd_install "$1" force; return 0;
     fi
 
     [[ "$1" == "updates" ]] || info 'upgrading MPR packages'
@@ -208,7 +224,7 @@ _upgrade() {
         [[ "$1" == "updates" ]] && upgrade_command "$line" || true
         [[ "$1" == "updates" ]] || $(upgrade_command "$line")
     done
-    [[ "$1" == "updates" ]] && return || true
+    [[ "$1" == "updates" ]] && return 0 || true
 
     echo
     info 'upgrading APT packages'
@@ -295,38 +311,12 @@ _update() {
     fi
 }
 
-_clone() {
-    pkgname="$1"
-
-    [[ -d "$pkgname" ]] && { info "The directory ${pkgname} already exists. Do you want to overwrite it? (press ENTER to proceed, or ^C to exit)"; }
-    read; rm -rf "$pkgname"
-    LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
-        { rm -rf "${pkgname}"; fatal "this MPR package doesn't exist or an error occured"; } || info "Cloned the git repo"
-}
-
-_status_file_update() {
-    sudo cp /var/lib/una/status /var/lib/una/status.old
-    LC_ALL=C dpkg-query -W --showformat='${MPR-Package} ${MPR-Version}\n' | sed -r '/^\s*$/d' | sudo tee /var/lib/una/status &>/dev/null
-}
-
-cmd_install() {
+_installable() {
     local pkgname="${1:?}"
-    
-    if [[ "$2" == "depend" ]]; then
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && return || true
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed" && return || true
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-bin" 2>/dev/null | grep -q "ok installed" && return || true
-    fi
-
-    if [[ "$2" != "force" ]]; then
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed" && fatal "${pkgname} is already installed" || true
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed" && fatal "${pkgname} is already installed" || true
-        LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-bin" 2>/dev/null | grep -q "ok installed" && fatal "${pkgname} is already installed" || true
-    fi
 
     sources=()
 
-    apt-cache show "${pkgname}" &>/dev/null && sources+=(apt)
+    LC_ALL=C apt-cache show -q "${pkgname}" &>/dev/null && sources+=(apt)
 
     sources+=($(python3 - "${pkgname}" <<'EOF'
 import requests, json, sys, os
@@ -381,6 +371,131 @@ except:
     sys.exit()
 EOF
     ))
+
+    if [[ "${#sources[@]}" -eq "0" ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+_installed() {
+    local pkgname="$1"
+
+    if { LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null | grep -q "ok installed"; } ||
+        { LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-git" 2>/dev/null | grep -q "ok installed"; } ||
+        { LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}-bin" 2>/dev/null | grep -q "ok installed"; }; then
+        echo -n installed
+    else
+        echo -n not-installed
+    fi
+}
+
+_clone() {
+    pkgname="$1"
+
+    [[ -d "$pkgname" ]] && { info "The directory ${pkgname} already exists. Do you want to overwrite it? (press ENTER to proceed, or ^C to exit)"; }
+    read; rm -rf "$pkgname"
+    LC_ALL=C git clone "https://mpr.makedeb.org/${pkgname}.git" 2>&1 | grep -q 'empty repository' && \
+        { rm -rf "${pkgname}"; fatal "this MPR package doesn't exist or an error occured"; } || info "Cloned the git repo"
+}
+
+_status_file_update() {
+    sudo cp /var/lib/una/status /var/lib/una/status.old
+    LC_ALL=C dpkg-query -W --showformat='${MPR-Package} ${MPR-Version}\n' | sed -r '/^\s*$/d' | sudo tee /var/lib/una/status &>/dev/null
+}
+
+cmd_install() {
+    local pkgname="$(echo ${1} | sed 's/ //g')"
+
+    if [[ -z "$pkgname" ]]; then
+        return 0
+    fi
+
+    if [[ "$(echo "$pkgname" | grep -o -i '|' | wc -l)" != 0 ]] && [[ ! -z "$(echo "${pkgname}" | cut -d '|' -f2)" ]]; then
+        success=0
+
+        for i in $(seq 1 $(("$(echo "$pkgname" | grep -o -i '|' | wc -l)"+1))); do
+            local pkg="$(echo "${pkgname}" | cut -d '|' -f"$i")"
+            [[ -z "$pkg" ]] && continue || true
+            [[ "$(_installed "$pkg")" == "installed" ]] && { success=1; break; } || true
+            _installable "$pkg" && cmd_install "$pkg" || continue
+        done
+
+        [[ ! "$success" -eq 1 ]] && fatal "failed to install ${1}"
+
+        return 0
+    fi
+
+    if [[ "$2" == "depend" ]]; then
+        [[ "$(_installed "$pkg")" == 'installed' ]] && return 0 || true
+    fi
+
+    if [[ "$2" != "force" ]]; then
+        [[ "$(_installed "$pkg")" == 'installed' ]] && fatal "${pkgname} is already installed" || true
+    fi
+
+    sources=()
+
+    apt-cache show "${pkgname}" &>/dev/null && sources+=(apt)
+
+    sources+=($(python3 - "${pkgname}" <<'EOF'
+import requests, json, sys, os
+
+try:
+    with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
+        paklist = json.load(pakfile)dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null
+
+        all_packages = [ x["Name"] for x in paklist ]
+        
+        if sys.argv[1] in all_packages:
+            print('mpr')
+        else:
+            sys.exit()
+except:
+    sys.exit()
+EOF
+    ))
+
+    sources+=($(python3 - "${pkgname}" <<'EOF'
+import requests, json, sys, os
+
+try:
+    with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
+        paklist = json.load(pakfile)
+
+        all_packages = [ x["Name"] for x in paklist ]
+
+        if sys.argv[1] + '-git' in all_packages:
+            print('mpr-git')
+        else:
+            sys.exit()
+except:
+    sys.exit()
+EOF
+    ))
+
+    sources+=($(python3 - "${pkgname}" <<'EOF'
+import requests, json, sys, os
+
+try:
+    with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
+        paklist = json.load(pakfile)
+
+        all_packages = [ x["Name"] for x in paklist ]
+        
+        if sys.argv[1] + '-bin' in all_packages:
+            print('mpr-bin')
+        else:
+            sys.exit()
+except:
+    sys.exit()
+EOF
+    ))
+    if [[ "${#sources[@]}" -eq "0" ]]; then
+        error "the package ${pkgname} does not exist"
+        return 0
+    fi
     [[ "$2" == "force" ]] && local re=re
     [[ "$2" == "force" ]] && local opt=force
     [[ "$2" == "depend" ]] && local opt=depend
@@ -392,7 +507,7 @@ EOF
         case "$(choose_option "${sources[@]}")" in
             apt)
                 if [[ "$2" == "depend" ]]; then
-                    LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null || mark=auto
+                    [[ _installed "${pkgname}" == "not-installed" ]] && mark=auto || true
                 fi
                 sudo apt-get "${re}install" -y "$pkgname"
                 [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
