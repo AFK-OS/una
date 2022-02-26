@@ -1,0 +1,50 @@
+= una(8)
+:doctype: manpage
+:hardbreaks:
+:manmanual: una manual
+:mansource: una {v3}
+
+== NAME
+una - a complete mpr helper
+
+== SYNOPSIS
+*una install* [_package_]
+*una remove* [_package_]
+*una search* _search-query_
+*una update*
+*una upgrade*
+*una list*
+
+== DESCRIPTION
+Una is a complete MPR helper written in `bash` (kinda demonstrates the power of shell scripts lol). It was created since the only other helper which is still being maintained, `tap`, had issues with handling dependencies from the MPR and regular APT dependencies. Una is a replacement for `tap` which has implemented all the features present in `tap` and more.
+
+*install* _package_ ...::
+Installs the specified packages onto the system.
++
+If any specified packages are available from multiple sources, *una* will prompt the user to choose which source to install from and then will proceed with the transaction.
+
+*remove* _package_ ...::
+Removes the specified packages from the system.
++
+If removing any of the specified packages would cause an essential (*dpkg*(1)) package to be removed, *una* aborts the transaction.
+
+*search* _query params_ ...::
+Searches APT and the MPR for each of the specified query parameters.
+
+*update*::
+Updates the APT and MPR repository caches on the local system.
+
+*upgrade*::
+Checks if any installed packages have upgrades available for installation.
+
+*list*::
+Lists all APT and MPR packages.
+
+== BUGS
+Issues, as well as feature requests, should be posted on the project's GitHub page: ::
+`+https://github.com/AFK-OS/una+`
+
+== AUTHORS
+Rudra Saraswat `+<ruds@ruds.io+`
+
+A full list of contributors can be found by running *git shortlog -esn* on una’s Git repository (linked under *BUGS*).
