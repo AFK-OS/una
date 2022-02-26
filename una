@@ -507,7 +507,7 @@ EOF
         case "$(choose_option "${sources[@]}")" in
             apt)
                 if [[ "$2" == "depend" ]]; then
-                    [[ _installed "${pkgname}" == "not-installed" ]] && mark=auto || true
+                    [[ "$(_installed "${pkgname}")" == "not-installed" ]] && mark=auto || true
                 fi
                 sudo apt-get "${re}install" -y "$pkgname"
                 [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
