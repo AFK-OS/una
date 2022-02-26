@@ -326,7 +326,7 @@ try:
         paklist = json.load(pakfile)
 
         all_packages = [ x["Name"] for x in paklist ]
-        
+
         if sys.argv[1] in all_packages:
             print('mpr')
         else:
@@ -362,7 +362,7 @@ try:
         paklist = json.load(pakfile)
 
         all_packages = [ x["Name"] for x in paklist ]
-        
+
         if sys.argv[1] + '-bin' in all_packages:
             print('mpr-bin')
         else:
@@ -437,17 +437,17 @@ cmd_install() {
 
     sources=()
 
-    apt-cache show "${pkgname}" &>/dev/null && sources+=(apt)
+    { apt-cache show "${pkgname}" &>/dev/null && [[ "$(_installed "$pkgname")" == "not-installed" ]]; } && sources+=(apt) || true
 
     sources+=($(python3 - "${pkgname}" <<'EOF'
 import requests, json, sys, os
 
 try:
     with open(os.path.expanduser('~/.cache/una/cache')) as pakfile:
-        paklist = json.load(pakfile)dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null
+        paklist = json.load(pakfile)
 
         all_packages = [ x["Name"] for x in paklist ]
-        
+
         if sys.argv[1] in all_packages:
             print('mpr')
         else:
@@ -483,7 +483,7 @@ try:
         paklist = json.load(pakfile)
 
         all_packages = [ x["Name"] for x in paklist ]
-        
+
         if sys.argv[1] + '-bin' in all_packages:
             print('mpr-bin')
         else:
