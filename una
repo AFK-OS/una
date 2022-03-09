@@ -26,7 +26,7 @@ blue=$'\e[1;34m'
 magenta=$'\e[1;35m'
 cyan=$'\e[1;36m'
 
-version='v3.1.0'
+version='v3.1.1'
 
 set -e
 
@@ -196,7 +196,7 @@ _install() {
     echo
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}"; do # "${new_optdepends[@]}"; do
-        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || { cmd_install "$depend" depend; }
+        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || { cmd_install "$depend" depend || echo lol; }
     done
 
     pkgname="${1:?}"
@@ -205,11 +205,11 @@ _install() {
     info "building ${pkgname}"
     echo
     cd "${HOME}/.cache/una/pkgs/${pkgname}" && { makedeb -H "MPR-Package: ${pkgname}" -H "MPR-Version: ${pkgver}" -s 2>/dev/null \
-        || { makedeb -H "MPR-Version: ${pkgver}" -s 2>/dev/null || { makedeb -s || { error 'an error occurred when building the package'; return 1; } }; }; }
+        || { makedeb -H "MPR-Version: ${pkgver}" -s 2>/dev/null || { makedeb -s || { [[ "$2" == "depend" ]] && exit 1 || { error 'an error occurred when building the package'; return 1; }; } }; }; }
     if [[ "$2" == "depend" ]]; then
         LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null || mark=auto
     fi
-    for pkg in ./$pkgname_*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || { error 'an error occurred when building the package'; return 1; }; done
+    for pkg in ./${pkgname}_*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || { error 'an error occurred when building the package'; return 1; }; done
     [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
 }
 
@@ -240,7 +240,7 @@ _remove() {
 _search() {
     pkgname="${1:?}"
 
-    [[ ${#pkgname} -lt 2 ]] && fatal 'search string too short (the length should be greater than 1)'
+    [[ "${#pkgname}" -lt 2 ]] && fatal 'search string too short (the length should be greater than 1)'
 
     curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}" | jq -cr ".results[] | \"${blue}\(.Name)/\(.Version) ${cyan}[MPR]${normal}\n  \(.Description)\""
 
@@ -494,7 +494,7 @@ EOF
     ))
     if [[ "${#sources[@]}" -eq "0" ]]; then
         error "the package ${pkgname} does not exist"
-        return 0
+        [[ "$2" == "depend" ]] && exit 1 || return 0
     fi
     [[ "$2" == "force" ]] && local re=re
     [[ "$2" == "force" ]] && local opt=force
@@ -540,7 +540,7 @@ fi
 trap "rm -f "${LOCKFILE:?}"; tput cnorm; exit" INT TERM EXIT
 echo $$ > ${LOCKFILE}
 
-if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || { [[ ! -f "$HOME/.config/autostart/una-updater.desktop" ]] || [[ ! -f '/var/lib/una/cache' ]]; } }; then
+if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || { [[ ! -f "$HOME/.config/autostart/una-updater.desktop" ]] || { [[ ! -f '/var/lib/una/cache' ]] || [[ ! -d "${HOME}/.cache/una" ]]; } } }; then
     echo
     info 'creating una directory and config files'
     mkdir -p "${HOME}/.config/autostart"
@@ -555,6 +555,7 @@ Name=Una Updater
 Comment=Auto-updater for APT and MPR packages.
 EOF
     sudo mkdir -p /var/lib/una
+    mkdir -p ~/.cache/una
     sudo touch /var/lib/una/status /var/lib/una/cache
     grep -q '^una-bin ' /var/lib/una/status 2>/dev/null || \
         { echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)" | sudo tee /var/lib/una/status &>/dev/null; }
@@ -571,8 +572,6 @@ if ! { [[ "$1" == "updates" ]] || { [[ "$1" == update ]] && [[ "$2" == user ]]; 
     sudo echo -n
     _status_file_update & _spinner 'updating MPR status'
 fi
-
-mkdir -p ~/.cache/una
 
 if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
     for app in "${@:2}"; do
