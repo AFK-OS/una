@@ -28,6 +28,13 @@ cyan=$'\e[1;36m'
 
 version='v3.1.1'
 
+# use apt-fast, if installed
+if [[ -f "/bin/apt-fast" ]]; then
+	apt_command="/bin/apt-fast"
+else
+	apt_command="/bin/apt-get"
+fi
+
 set -e
 
 echo "${cyan}una ${version}${normal}" 1>&2
@@ -209,7 +216,7 @@ _install() {
     if [[ "$2" == "depend" ]]; then
         LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null || mark=auto
     fi
-    for pkg in ./${pkgname}_*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || { error 'an error occurred when building the package'; return 1; }; done
+    for pkg in ./${pkgname}_*.deb; do sudo $apt_command "${re}install" -y --no-install-recommends "$pkg" || { error 'an error occurred when building the package'; return 1; }; done
     [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
 }
 
@@ -228,23 +235,24 @@ _upgrade() {
 
     echo
     info 'upgrading APT packages'
-    sudo apt-get dist-upgrade -y --auto-remove
+    sudo $apt_command dist-upgrade -y --auto-remove
 }
 
 _remove() {
     pkgname="${1:?}"
 
-    sudo apt-get purge -y "${pkgname}"
+    sudo $apt_command purge -y "${pkgname}"
 }
 
 _search() {
-    pkgname="${1:?}"
+    pkgname="$@"
 
     [[ "${#pkgname}" -lt 2 ]] && fatal 'search string too short (the length should be greater than 1)'
 
     curl -s "https://mpr.makedeb.org/rpc?v=5&type=search&arg=${pkgname}" | jq -cr ".results[] | \"${blue}\(.Name)/\(.Version) ${cyan}[MPR]${normal}\n  \(.Description)\""
 
-    for pkgname in $(apt-cache pkgnames hello 2>/dev/null); do
+	# cut descriptions and stuff (thats what the sed's for)
+    for pkgname in $(apt-cache search "$pkgname" | sed "s/\s.*//g"); do
         echo "${blue}${pkgname}/$(LANG=C apt-cache show ${pkgname} | grep '^Version: ' | sed '0,/Version: /{s/Version: //}') ${cyan}[APT]${normal}"
         echo "  $(LANG=C apt-cache show ${pkgname} | grep '^Description-en: ' | sed '0,/Description-en: /{s/Description-en: //}')"
     done
@@ -301,7 +309,7 @@ _update() {
     else
         echo
         sudo echo -n
-        ( sudo apt-get update &>/dev/null || true; ) & _spinner 'updating APT cache'
+        ( sudo $apt_command update &>/dev/null || true; ) & _spinner 'updating APT cache'
         tput civis
         (
             { curl -qs 'https://mpr.makedeb.org/packages-meta-ext-v1.json.gz' | gunzip | sudo tee /var/lib/una/cache &>/dev/null; } || fatal 'are you sure you are connected to a network?'
@@ -509,7 +517,7 @@ EOF
                 if [[ "$2" == "depend" ]]; then
                     [[ "$(_installed "${pkgname}")" == "not-installed" ]] && mark=auto || true
                 fi
-                sudo apt-get "${re}install" -y "$pkgname"
+                sudo $apt_command "${re}install" -y "$pkgname"
                 [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
                 ;;
             mpr)
@@ -527,6 +535,13 @@ EOF
 
 if [[ "$EUID" == "0" ]] && [[ "$3" != "root" ]]; then
     fatal 'running as root can cause problems'
+fi
+
+# check for missing args
+if [[ -z "${@:2}" ]] && { [[ "$1" == "install" ]] || [[ "$1" == "clone" ]] || [[ "$1" == "remove" ]] || [[ "$1" == "search" ]] || [[ "$1" == "info" ]] || [[ "$1" == "show" ]]; }; then
+	fatal "an argument is required"
+elif [[ -z "${@:3}" ]] && [[ "$1" == "install" ]] && [[ "$2" == "--edit" ]]; then
+	fatal "an argument is required"
 fi
 
 # check if lockfile exists
@@ -582,16 +597,16 @@ if [[ "$1" == "install" ]] && [[ "$2" != "" ]]; then
         fi
     done
 elif [[ "$1" == "update" ]]; then
-    _update "$2";
+	_update "$2"
 elif [[ "$1" == "updates" ]]; then
     updates="$(_upgrade updates)"
     [[ -z "${updates}" ]] && exit 1 || echo "${updates}"
 elif [[ "$1" == "list" ]]; then
     dpkg -l;
 elif [[ "$1" == "autoremove" ]]; then
-    sudo apt-get autoremove --purge;
+    sudo $apt_command autoremove --purge;
 elif [[ "$1" == "clone" ]]; then
-    _clone "$2";
+	for app in "${@:2}"; do _clone "$2"; done
 elif [[ "$1" == "remove" ]] || [[ "$1" == "purge" ]]; then
     for app in "${@:2}"; do _remove "$app"; done
 elif [[ "$1" == "upgrade" ]]; then
@@ -600,10 +615,11 @@ elif [[ "$1" == "upgrade" ]]; then
     [[ "$apps_i" == 0 ]] && _upgrade || true
 elif [[ "$1" == "search" ]] && [[ "$2" != "" ]]; then
     echo
-    tput civis; results="$(_search "$2" & _spinner ${green}searching${normal})"; tput cnorm
-    echo -e "$results" | less;
+    tput civis; results="$(_search "${@:2}" & _spinner ${green}searching${normal})"; tput cnorm
+	# removed less here because less looks ugly with color formatting
+    echo -e "$results"
 elif { [[ "$1" == "info" ]] || [[ "$1" == "show" ]]; } && [[ "$2" != "" ]]; then
-    _info "$2";
+	for app in "${@:2}"; do _info "$app"; echo ""; done
 elif [[ -z "$1" ]] || [[ "$1" == "help" ]]; then
     _help;
 fi
