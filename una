@@ -26,7 +26,7 @@ blue=$'\e[1;34m'
 magenta=$'\e[1;35m'
 cyan=$'\e[1;36m'
 
-version='v3.1.1'
+version='v3.2.0'
 
 set -e
 
@@ -196,7 +196,7 @@ _install() {
     echo
     info "installing dependencies of ${pkgname}"
     for depend in "${depends[@]}" "${makedepends[@]}" "${checkdepends[@]}"; do # "${new_optdepends[@]}"; do
-        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || { cmd_install "$depend" depend || echo lol; }
+        dpkg-query -W -f='${Status}' "${depend}" 2>/dev/null | grep -q "ok installed" && true || cmd_install "$depend" depend
     done
 
     pkgname="${1:?}"
@@ -204,6 +204,17 @@ _install() {
     echo
     info "building ${pkgname}"
     echo
+    for field in "${control_fields[@]}"; do
+        if [[ "${field%:*}" == "MPR-Package" ]] || [[ "${field%:*}" == "MPR-Version" ]]; then
+            cd "${HOME}/.cache/una/pkgs/${pkgname}" && { makedeb -s || { [[ "$2" == "depend" ]] && exit 1 || { error 'an error occurred when building the package'; return 1; }; }; }
+            if [[ "$2" == "depend" ]]; then
+                LC_ALL=C dpkg-query -W -f='${Status}' "${pkgname}" 2>/dev/null || mark=auto
+            fi
+            for pkg in ./${pkgname}_*.deb; do sudo apt-get "${re}install" -y --no-install-recommends "$pkg" || { error 'an error occurred when building the package'; return 1; }; done
+            [[ "$mark" == "auto" ]] && { sudo apt-mark auto "$pkgname"; unset mark; } || true
+            return
+        fi
+    done
     cd "${HOME}/.cache/una/pkgs/${pkgname}" && { makedeb -H "MPR-Package: ${pkgname}" -H "MPR-Version: ${pkgver}" -s 2>/dev/null \
         || { makedeb -H "MPR-Version: ${pkgver}" -s 2>/dev/null || { makedeb -s || { [[ "$2" == "depend" ]] && exit 1 || { error 'an error occurred when building the package'; return 1; }; } }; }; }
     if [[ "$2" == "depend" ]]; then
@@ -540,7 +551,7 @@ fi
 trap "rm -f "${LOCKFILE:?}"; tput cnorm; exit" INT TERM EXIT
 echo $$ > ${LOCKFILE}
 
-if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || { [[ ! -f "$HOME/.config/autostart/una-updater.desktop" ]] || { [[ ! -f '/var/lib/una/cache' ]] || [[ ! -d "${HOME}/.cache/una" ]]; } } }; then
+if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || { [[ ! -f "$HOME/.config/autostart/una-updater.desktop" ]] || { [[ ! -f '/var/lib/una/cache' ]] || { [[ ! -d "${HOME}/.cache/una" ]] || [[ ! -f "/etc/una/config" ]]; } } } }; then
     echo
     info 'creating una directory and config files'
     mkdir -p "${HOME}/.config/autostart"
@@ -554,7 +565,11 @@ X-GNOME-Autostart-enabled=true
 Name=Una Updater
 Comment=Auto-updater for APT and MPR packages.
 EOF
-    sudo mkdir -p /var/lib/una
+    cat <<'EOF' | sudo tee "/etc/una/config" &>/dev/null
+auto_update=true # enable/disable update notifications; set to true or false
+update_check_gap=1d # time gap between checking for updates if auto_update=true; 's' for seconds (the default), 'm' for minutes, 'h' for hours or 'd' for days
+EOF
+    sudo mkdir -p /var/lib/una /etc/una
     mkdir -p ~/.cache/una
     sudo touch /var/lib/una/status /var/lib/una/cache
     grep -q '^una-bin ' /var/lib/una/status 2>/dev/null || \

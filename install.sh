@@ -1,15 +1,16 @@
 #!/bin/bash
 
-wget -qO - 'https://proget.hunterwittenborn.com/debian-feeds/makedeb.pub' | \
+wget -qO - 'https://proget.makedeb.org/debian-feeds/makedeb.pub' | \
 gpg --dearmor | \
 sudo tee /usr/share/keyrings/makedeb-archive-keyring.gpg &> /dev/null
 
-echo 'deb [signed-by=/usr/share/keyrings/makedeb-archive-keyring.gpg arch=all] https://proget.hunterwittenborn.com/ makedeb main' | \
+echo 'deb [signed-by=/usr/share/keyrings/makedeb-archive-keyring.gpg arch=all] https://proget.makedeb.org makedeb main' | \
 sudo tee /etc/apt/sources.list.d/makedeb.list
 
 sudo apt-get update && sudo apt-get install makedeb
 
-git clone https://mpr.makedeb.org/una-bin.git && cd una-bin
-makedeb -si && cd .. && rm -rf una-bin
+git clone https://github.com/AFK-OS/una && cd una
 
-una update; una help
+./una update; ./una install una-bin
+
+una help

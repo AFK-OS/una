@@ -2,7 +2,7 @@
 <div id="top"></div>
 
 <h1 align="center">Una</h1>
-<h3 align="center">v3.1.1</h3>
+<h3 align="center">v3.2.0</h3>
 
 <br>
 
@@ -79,7 +79,7 @@ Don't forget to give the project a star! Thanks again!
 <!-- LICENSE -->
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the GPLv3 License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
