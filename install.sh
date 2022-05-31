@@ -1,16 +1,15 @@
 #!/bin/bash
 
-wget -qO - 'https://proget.makedeb.org/debian-feeds/makedeb.pub' | \
+wget -qO - 'https://proget.hunterwittenborn.com/debian-feeds/makedeb.pub' | \
 gpg --dearmor | \
 sudo tee /usr/share/keyrings/makedeb-archive-keyring.gpg &> /dev/null
 
-echo 'deb [signed-by=/usr/share/keyrings/makedeb-archive-keyring.gpg arch=all] https://proget.makedeb.org makedeb main' | \
+echo 'deb [signed-by=/usr/share/keyrings/makedeb-archive-keyring.gpg arch=all] https://proget.hunterwittenborn.com/ makedeb main' | \
 sudo tee /etc/apt/sources.list.d/makedeb.list
 
 sudo apt-get update && sudo apt-get install makedeb
 
-git clone https://github.com/AFK-OS/una && cd una
+git clone https://mpr.makedeb.org/una-bin.git && cd una-bin
+makedeb -H "MPR-Package: una-bin" -H "MPR-Version: 3.2.0" -si && cd .. && rm -rf una-bin
 
-./una update; ./una install una-bin
-
-una help
+una update; una help
