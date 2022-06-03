@@ -565,11 +565,11 @@ X-GNOME-Autostart-enabled=true
 Name=Una Updater
 Comment=Auto-updater for APT and MPR packages.
 EOF
+    sudo mkdir -p /var/lib/una /etc/una
     cat <<'EOF' | sudo tee "/etc/una/config" &>/dev/null
 auto_update=true # enable/disable update notifications; set to true or false
 update_check_gap=1d # time gap between checking for updates if auto_update=true; 's' for seconds (the default), 'm' for minutes, 'h' for hours or 'd' for days
 EOF
-    sudo mkdir -p /var/lib/una /etc/una
     mkdir -p ~/.cache/una
     sudo touch /var/lib/una/status /var/lib/una/cache
     grep -q '^una-bin ' /var/lib/una/status 2>/dev/null || \
