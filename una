@@ -554,7 +554,7 @@ echo $$ > ${LOCKFILE}
 if [[ ! -d '/var/lib/una' ]] || { [[ ! -f '/var/lib/una/status' ]] || { [[ ! -f "$HOME/.config/autostart/una-updater.desktop" ]] || { [[ ! -f '/var/lib/una/cache' ]] || { [[ ! -d "${HOME}/.cache/una" ]] || [[ ! -f "/etc/una/config" ]]; } } } }; then
     echo
     info 'creating una directory and config files'
-    mkdir -p "${HOME}/.config/autostart"
+    mkdir -p "${HOME}/.config/autostart" "${HOME}/.cache/una"
     cat <<'EOF' >"${HOME}/.config/autostart/una-updater.desktop"
 [Desktop Entry]
 Type=Application
@@ -565,12 +565,9 @@ X-GNOME-Autostart-enabled=true
 Name=Una Updater
 Comment=Auto-updater for APT and MPR packages.
 EOF
-    cat <<'EOF' | sudo tee "/etc/una/config" &>/dev/null
-auto_update=true # enable/disable update notifications; set to true or false
-update_check_gap=1d # time gap between checking for updates if auto_update=true; 's' for seconds (the default), 'm' for minutes, 'h' for hours or 'd' for days
-EOF
+    sudo sh -c "echo 'auto_update=true # enable/disable update notifications; set to true or false' >/etc/una/config"
+    sudo sh -c "echo 'update_check_gap=1d # time gap between checking for updates if auto_update=true; s for seconds (the default), m for minutes, h for hours or d for days' >/etc/una/config"
     sudo mkdir -p /var/lib/una /etc/una
-    mkdir -p ~/.cache/una
     sudo touch /var/lib/una/status /var/lib/una/cache
     grep -q '^una-bin ' /var/lib/una/status 2>/dev/null || \
         { echo "una-bin $(LC_ALL=C dpkg-query --show --showformat '${Version}\n' una-bin)" | sudo tee /var/lib/una/status &>/dev/null; }
