@@ -1,5 +1,8 @@
 #!/bin/bash
 
+command -v git || sudo apt install -y git
+command -v gpg || sudo apt install -y gpg
+
 wget -qO - 'https://proget.hunterwittenborn.com/debian-feeds/makedeb.pub' | \
 gpg --dearmor | \
 sudo tee /usr/share/keyrings/makedeb-archive-keyring.gpg &> /dev/null
