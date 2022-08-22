@@ -17,7 +17,7 @@ _ui() {
 }
 
 # UNA-NONEXISTENT: Adding nonexistent directory
-    mkdir -p /etc/una
+    sudo mkdir -p /etc/una
 
 while true; do
     source /etc/una/config &>/dev/null
