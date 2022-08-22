@@ -1,4 +1,4 @@
-Additions to avoid `Directory nonexistent` error
+Additions to avoid `Directory nonexistent` error.
 
 
 <div id="top"></div>
