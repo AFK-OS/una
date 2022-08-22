@@ -16,6 +16,9 @@ _ui() {
     zenity --question --text 'Updated packages are available. Do you wish to upgrade?' --width 200 && x-terminal-emulator -e 'una upgrade; echo; echo "You can now close this window or press ENTER to close."; read enter' &
 }
 
+# UNA-NONEXISTENT: Adding nonexistent directory
+    mkdir -p /etc/una
+
 while true; do
     source /etc/una/config &>/dev/null
     if [[ "${auto_update}" == "true" ]]; then
