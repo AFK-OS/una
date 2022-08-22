@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -xv
-
 wget -qO - 'https://proget.hunterwittenborn.com/debian-feeds/makedeb.pub' | \
 gpg --dearmor | \
 sudo tee /usr/share/keyrings/makedeb-archive-keyring.gpg &> /dev/null
@@ -19,5 +17,3 @@ git clone https://mpr.makedeb.org/una-bin.git && cd una-bin
 makedeb -H "MPR-Package: una-bin" -H "MPR-Version: 3.2.0" -si && cd .. && rm -rf una-bin
 
 una update; una help
-
-set +xv
