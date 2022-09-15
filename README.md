@@ -49,7 +49,7 @@ bash <(curl -fsL https://github.com/AFK-OS/una/raw/main/install.sh)
 - [x] Support for auto-completions.
 - [x] Support for cloning packages from the MPR, separate from installation.
 - [x] Auto updater.
-- [x] Implement all the features listed on https://docs.makedeb.org/mpr/list-of-mpr-helpers/.
+- [x] Implement all the features listed on https://docs.makedeb.org/using-the-mpr/list-of-mpr-helpers/.
 - [x] Install `-git` package if main package doesn't exist.
 - [x] Compatibility with other MPR helpers.
 - [x] Support for installing multiple packages together.
