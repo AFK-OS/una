@@ -37,6 +37,12 @@ Una is a complete MPR helper written in `bash` (kinda demonstrates the power of 
 bash <(curl -fsL https://github.com/AFK-OS/una/raw/main/install.sh)
 ```
 
+<!-- REMOVAL -->
+## Removal
+
+```sh
+sudo dpkg -r una-bin
+```
 
 <!-- ROADMAP -->
 ## Roadmap
