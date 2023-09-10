@@ -19,6 +19,7 @@ _ui() {
 while true; do
     source /etc/una/config &>/dev/null
     if [[ "${auto_update}" == "true" ]]; then
-        _ui; sleep "${update_check_gap}"
+        _ui
     fi
+    sleep "${update_check_gap}"
 done
